@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Quantum Bit Generator</title>
+    
+    <!-- CodeMirror CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/material-lighter.min.css">
+    
+    <style>
+        /* Your existing styles stay the same... */
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background: linear-gradient(135deg, #e8f4fd 0%, #d3cedc 100%);
+            cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><circle cx="10" cy="10" r="2" fill="%23b794f6"/><ellipse cx="10" cy="10" rx="8" ry="3" fill="none" stroke="%235a67d8" stroke-width="1"/><ellipse cx="10" cy="10" rx="3" ry="8" fill="none" stroke="%235a67d8" stroke-width="1"/></svg>') 10 10, auto;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        /* Add CodeMirror custom styling */
+        .CodeMirror {
+            height: 100% !important;
+            font-family: 'Courier New', monospace !important;
+            font-size: 13px !important;
+            border-radius: 8px !important;
+            border: 1px solid rgba(214, 231, 255, 0.8) !important;
+            background: rgba(255, 255, 255, 0.9) !important;
+        }
+        
+        .CodeMirror-focused .CodeMirror-cursor {
+            border-left: 2px solid #5a67d8 !important;
+        }
+        
+        .CodeMirror-selected {
+            background: rgba(90, 103, 216, 0.2) !important;
+        }
+        
+        /* Keep all your existing styles... */
+
+        body:active {
+            cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><circle cx="10" cy="10" r="2" fill="%23b794f6"/><ellipse cx="10" cy="10" rx="8" ry="3" fill="none" stroke="%235a67d8" stroke-width="1"/><ellipse cx="10" cy="10" rx="3" ry="8" fill="none" stroke="%235a67d8" stroke-width="1"/></svg>') 10 10, auto;
+        }
+        canvas { display: block; }
+        
+        /* Force atom cursor everywhere except text inputs */
+        * {
+            cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><circle cx="10" cy="10" r="2" fill="%23b794f6"/><ellipse cx="10" cy="10" rx="8" ry="3" fill="none" stroke="%235a67d8" stroke-width="1"/><ellipse cx="10" cy="10" rx="3" ry="8" fill="none" stroke="%235a67d8" stroke-width="1"/></svg>') 10 10, auto !important;
+        }
+
+        /* Text cursor only for CodeMirror editor */
+        .CodeMirror, .CodeMirror * {
+            cursor: text !important;
+        }
+
+        .CodeMirror-cursor {
+            cursor: text !important;
+        }
+
+        /* Atom cursor for all terminal elements */
+        #terminal-container,
+        #terminal-header,
+        #terminal-body,
+        #terminal-output,
+        .terminal-buttons,
+        .btn,
+        .terminal-title,
+        #code-container,
+        #code-header,
+        #code-body {
+            cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><circle cx="10" cy="10" r="2" fill="%23b794f6"/><ellipse cx="10" cy="10" rx="8" ry="3" fill="none" stroke="%235a67d8" stroke-width="1"/><ellipse cx="10" cy="10" rx="3" ry="8" fill="none" stroke="%235a67d8" stroke-width="1"/></svg>') 10 10, auto !important;
+        }
+
+        /* Atom cursor for canvas and 3D elements */
+        canvas {
+            cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><circle cx="10" cy="10" r="2" fill="%23b794f6"/><ellipse cx="10" cy="10" rx="8" ry="3" fill="none" stroke="%235a67d8" stroke-width="1"/><ellipse cx="10" cy="10" rx="3" ry="8" fill="none" stroke="%235a67d8" stroke-width="1"/></svg>') 10 10, auto !important;
+        }
+        
+        /* Code Input Container */
+        #code-container {
+            position: absolute;
+            left: 50px;
+            top: 30px;
+            width: 35%;
+            height: 45%;
+            background: rgba(232, 244, 253, 0.95);
+            border-radius: 12px;
+            font-family: 'Courier New', monospace;
+            box-shadow: 0 8px 32px rgba(138, 143, 244, 0.3);
+            backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+            z-index: 1000;
+            border: 2px solid rgba(200, 216, 240, 0.8);
+        }
+
+        #code-header {
+            background: linear-gradient(135deg, #d6e7ff 0%, #e1d5f7 100%);
+            padding: 12px 18px;
+            border-radius: 12px 12px 0 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid rgba(200, 216, 240, 0.6);
+            box-shadow: 0 2px 8px rgba(138, 143, 244, 0.1);
+        }
+
+        .code-title {
+            color: #5a67d8;
+            font-size: 13px;
+            font-weight: bold;
+            text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
+        }
+
+        #code-body {
+            flex: 1;
+            padding: 18px;
+            background: linear-gradient(135deg, #f7faff 0%, #faf5ff 100%);
+            border-radius: 0 0 12px 12px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #code-input {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(214, 231, 255, 0.8);
+            border-radius: 8px;
+            padding: 12px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            color: #4a5568;
+            resize: none;
+            outline: none;
+            box-shadow: 0 2px 8px rgba(138, 143, 244, 0.1);
+            margin-bottom: 10px;
+        }
+
+        #code-input::placeholder {
+            color: #a0aec0;
+        }
+
+        #run-button {
+            background: linear-gradient(135deg, #8b5cf6 0%, #5a67d8 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><circle cx="10" cy="10" r="2" fill="%23b794f6"/><ellipse cx="10" cy="10" rx="8" ry="3" fill="none" stroke="%235a67d8" stroke-width="1"/><ellipse cx="10" cy="10" rx="3" ry="8" fill="none" stroke="%235a67d8" stroke-width="1"/></svg>') 10 10, auto !important;
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+            transition: all 0.2s ease;
+        }
+
+        #run-button:hover {
+            background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(139, 92, 246, 0.4);
+        }
+
+        /* Terminal Output Container */
+        #terminal-container {
+            position: absolute;
+            left: 50px;
+            bottom: 30px;
+            width: 35%;
+            height: 45%;
+            background: rgba(232, 244, 253, 0.95);
+            border-radius: 12px;
+            font-family: 'Courier New', monospace;
+            box-shadow: 0 8px 32px rgba(138, 143, 244, 0.3);
+            backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+            z-index: 1000;
+            border: 2px solid rgba(200, 216, 240, 0.8);
+        }
+
+        #terminal-header {
+            background: linear-gradient(135deg, #d6e7ff 0%, #e1d5f7 100%);
+            padding: 12px 18px;
+            border-radius: 12px 12px 0 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid rgba(200, 216, 240, 0.6);
+            box-shadow: 0 2px 8px rgba(138, 143, 244, 0.1);
+        }
+
+        .terminal-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .terminal-title {
+            color: #5a67d8;
+            font-size: 13px;
+            font-weight: bold;
+            text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
+        }
+
+        #terminal-body {
+            flex: 1;
+            padding: 18px;
+            background: linear-gradient(135deg, #f7faff 0%, #faf5ff 100%);
+            border-radius: 0 0 12px 12px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #terminal-output {
+            flex: 1;
+            color: #4a5568;
+            font-size: 13px;
+            line-height: 1.5;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            background: rgba(255, 255, 255, 0.7);
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            box-shadow: inset 0 2px 4px rgba(138, 143, 244, 0.05);
+        }
+
+        /* Enhanced scrollbar styling */
+        #terminal-output::-webkit-scrollbar, #code-input::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        #terminal-output::-webkit-scrollbar-track, #code-input::-webkit-scrollbar-track {
+            background: rgba(232, 244, 253, 0.5);
+            border-radius: 4px;
+        }
+
+        #terminal-output::-webkit-scrollbar-thumb, #code-input::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, #c8d8f0 0%, #b794f6 100%);
+            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        #terminal-output::-webkit-scrollbar-thumb:hover, #code-input::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(135deg, #b794f6 0%, #8b5cf6 100%);
+        }
+
+        /* Display Panel */
+        #display-panel {
+            position: absolute;
+            right: 50px;
+            top: 30px;
+            bottom: 30px;
+            left: 45%;
+            background: rgba(232, 244, 253, 0.95);
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(138, 143, 244, 0.3);
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(200, 216, 240, 0.8);
+            display: flex;
+            flex-direction: column;
+            z-index: 500;
+        }
+
+        #display-header {
+            background: linear-gradient(135deg, #d6e7ff 0%, #e1d5f7 100%);
+            padding: 12px 18px;
+            border-radius: 12px 12px 0 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-bottom: 1px solid rgba(200, 216, 240, 0.6);
+            box-shadow: 0 2px 8px rgba(138, 143, 244, 0.1);
+        }
+
+        .panel-title {
+            color: #5a67d8;
+            font-size: 13px;
+            font-weight: bold;
+            text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
+        }
+
+        #display-body {
+            flex: 1;
+            position: relative;
+            overflow: visible;
+            border-radius: 0 0 12px 12px;
+            background: linear-gradient(135deg, #f7faff 0%, #faf5ff 100%);
+        }
+
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            overflow: visible;
+        }
+
+        #welcome-message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #5a67d8;
+            font-size: 18px;
+            font-weight: 300;
+            opacity: 0.7;
+        }
+
+        #welcome-message .subtitle {
+            font-size: 14px;
+            margin-top: 10px;
+            color: #8b5cf6;
+        }
+
+        .CodeMirror-placeholder {
+            color: #a0aec0 !important;
+            font-style: italic;
+        }
+
+        /* Multi-qubit grid styles */
+        .qubit-grid {
+            display: grid;
+            gap: 0px;
+            padding: 0px;
+            height: 100%;
+            width: 100%;
+            box-sizing: border-box;
+            place-items: center;
+        }
+
+        .qubit-grid > div {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            height: 100%;
+        }
+
+    </style>
+</head>
+<body>
+    <!-- Code Input Container -->
+    <div id="code-container">
+        <div id="code-header">
+            <div class="code-title">Qiskit Code Editor</div>
+        </div>
+        <div id="code-body">
+            <div id="code-input"></div>
+            <button id="run-button">▶ Run Code</button>
+        </div>
+    </div>
+
+    <!-- Terminal Output Container -->
+    <div id="terminal-container">
+        <div id="terminal-header">
+            <div class="terminal-title">Output Terminal</div>
+        </div>
+        <div id="terminal-body">
+            <div id="terminal-output"></div>
+        </div>
+    </div>
+
+    <!-- Display Panel -->
+    <div id="display-panel">
+        <div id="display-header">
+            <div class="code-title">Quantum State Visualization</div>
+        </div>
+        <div id="display-body">
+            <div id="canvas-container">
+                <div id="welcome-message">
+                    <div>Welcome to Quantum Visualizer</div>
+                    <div class="subtitle">Run quantum code to see Bloch sphere visualization</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<!-- Load Three.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<!-- Add CodeMirror JavaScript -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/python/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/display/placeholder.min.js"></script>
+    
+    <script>
+        // Global variables for multi-qubit support
+        let currentBlochSpheres = [];
+        let currentGridContainer = null;
+
+        // Backend API functions
+        async function runQiskitCode(code) {
+            try {
+                const response = await fetch('/execute', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ code: code })
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    addToTerminal(`Code executed successfully`);
+                    addToTerminal(`Detected ${data.num_qubits} qubit(s)`);
+                    
+                    // Create multi-qubit visualization
+                    createMultiQubitVisualization(data.bloch_data, data.grid_rows, data.grid_cols);
+                    
+                    // Log each qubit state
+                    data.bloch_data.forEach((qubit, index) => {
+                        const coords = qubit.coordinates;
+                        addToTerminal(`${qubit.label}: x=${coords[0].toFixed(3)}, y=${coords[1].toFixed(3)}, z=${coords[2].toFixed(3)}`);
+                    });
+                } else {
+                    addToTerminal(`Error: ${data.error}`, true);
+                }
+            } catch (error) {
+                addToTerminal(`Connection error: ${error.message}`, true);
+            }
+        }
+
+        // Initialize CodeMirror
+        const codeEditor = CodeMirror(document.getElementById('code-input'), {
+            mode: 'python',
+            theme: 'material-lighter',
+            lineNumbers: true,
+            indentUnit: 4,
+            indentWithTabs: false,
+            lineWrapping: true,
+            value: ``,
+            placeholder: `Enter your Qiskit code here, for example:
+
+from qiskit import QuantumCircuit
+
+# Single qubit example
+qc = QuantumCircuit(1)
+qc.h(0)  # Hadamard gate
+
+# Multi-qubit example
+# qc = QuantumCircuit(3)
+# qc.h(0)
+# qc.x(1)
+# qc.ry(3.14159/4, 2)`,
+            extraKeys: {
+                "Ctrl-Enter": function(cm) {
+                    runButton.click();
+                }
+            }
+        });
+
+        // Terminal functionality
+        const terminalOutput = document.getElementById('terminal-output');
+        const runButton = document.getElementById('run-button');
+
+        function addToTerminal(text, isError = false) {
+            const timestamp = new Date().toLocaleTimeString();
+            const prefix = `[${timestamp}] `;
+            const color = isError ? 'color: #e53e3e;' : '';
+            terminalOutput.innerHTML += `<span style="${color}">${prefix}${text}</span>\n`;
+            terminalOutput.scrollTop = terminalOutput.scrollHeight;
+        }
+
+        // Run button click handler
+        runButton.addEventListener('click', async () => {
+            const code = codeEditor.getValue().trim();
+            if (code) {
+                addToTerminal(`Executing Qiskit code...`);
+                await runQiskitCode(code);
+            } else {
+                addToTerminal('No code to execute', true);
+            }
+        });
+
+        // Multi-qubit visualization functions
+        function createMultiQubitVisualization(blochData, gridRows, gridCols) {
+            const canvasContainer = document.getElementById('canvas-container');
+            const welcomeMessage = document.getElementById('welcome-message');
+            
+            // Hide welcome message
+            if (welcomeMessage) {
+                welcomeMessage.style.display = 'none';
+            }
+            
+            // Clear existing visualization
+            clearExistingVisualization();
+            
+            // Create grid container
+            const gridContainer = document.createElement('div');
+            gridContainer.className = 'qubit-grid';
+            gridContainer.style.gridTemplateRows = `repeat(${gridRows}, 1fr)`;
+            gridContainer.style.gridTemplateColumns = `repeat(${gridCols}, 1fr)`;
+            
+            canvasContainer.appendChild(gridContainer);
+            currentGridContainer = gridContainer;
+            
+            // Calculate sphere size based on grid
+            const containerRect = canvasContainer.getBoundingClientRect();
+            const maxSphereSize = Math.min(
+                (containerRect.width) / gridCols,
+                (containerRect.height) / gridRows
+            );
+            
+            // Create Bloch sphere for each qubit
+            blochData.forEach((qubitData, index) => {
+                createSingleBlochSphere(gridContainer, qubitData, maxSphereSize);
+            });
+        }
+
+        function clearExistingVisualization() {
+            // Dispose of existing Three.js resources
+            currentBlochSpheres.forEach(sphere => {
+                if (sphere.renderer) {
+                    sphere.renderer.dispose();
+                }
+                if (sphere.scene) {
+                    // Dispose of geometries and materials
+                    sphere.scene.traverse((object) => {
+                        if (object.geometry) {
+                            object.geometry.dispose();
+                        }
+                        if (object.material) {
+                            if (Array.isArray(object.material)) {
+                                object.material.forEach(material => material.dispose());
+                            } else {
+                                object.material.dispose();
+                            }
+                        }
+                    });
+                }
+            });
+            
+            // Clear arrays
+            currentBlochSpheres = [];
+            
+            // Remove grid container
+            if (currentGridContainer) {
+                currentGridContainer.remove();
+                currentGridContainer = null;
+            }
+        }
+
+        function createSingleBlochSphere(parentContainer, qubitData, maxSize) {
+            // Create simple canvas container without box styling
+            const canvasDiv = document.createElement('div');
+            canvasDiv.style.position = 'relative';
+            canvasDiv.style.width = '100%';
+            canvasDiv.style.height = '100%';
+            canvasDiv.style.overflow = 'visible';
+            
+            // Calculate font size that scales more slowly
+            const baseFontSize = 8; // Minimum font size
+            const scaledFontSize = baseFontSize + (maxSize / 50); // Scales much slower
+            
+            // Add qubit label in upper left corner
+            const qubitLabel = document.createElement('div');
+            qubitLabel.textContent = qubitData.label;
+            qubitLabel.style.position = 'absolute';
+            qubitLabel.style.top = '10px';
+            qubitLabel.style.left = '10px';
+            qubitLabel.style.color = '#8b5cf6';
+            qubitLabel.style.fontSize = `${scaledFontSize}px`;
+            qubitLabel.style.fontWeight = 'regular';
+            qubitLabel.style.fontFamily = '"Segoe UI", Tahoma, Geneva, Verdana, sans-serif';
+            qubitLabel.style.zIndex = '1000';
+            qubitLabel.style.pointerEvents = 'none';
+            
+            canvasDiv.appendChild(qubitLabel);
+            parentContainer.appendChild(canvasDiv);
+            
+            // Wait for container to be in DOM, then create Three.js scene
+            setTimeout(() => {
+                const sphereSize = maxSize;
+                const sphereData = createBlochSphereScene(canvasDiv, sphereSize, qubitData.coordinates, qubitData.label);
+                currentBlochSpheres.push(sphereData);
+            }, 10);
+        }
+
+        function createBlochSphereScene(container, size, coordinates, qubitLabel) {
+            const baseLabelScale = 0.8; // Minimum label size
+            const labelScaleFactor = baseLabelScale + (size / 2000) * 0.1;
+            
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
+            const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            
+            renderer.setSize(size, size);
+            renderer.setClearColor(0xf8f9fa, 0.1);
+            container.appendChild(renderer.domElement);
+            
+            // Create sphere with enhanced translucent material matching color scheme
+            const sphereGeometry = new THREE.SphereGeometry(2, 32, 32);
+            const sphereMaterial = new THREE.MeshBasicMaterial({ 
+                color: 0xe0e1e3,
+                transparent: true, 
+                opacity: 0.3,
+                side: THREE.DoubleSide,
+                depthWrite: false
+            });
+            const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+            scene.add(sphere);
+
+            // Create a group for the equatorial elements
+            const equatorialGroup = new THREE.Group();
+
+            // Create equatorial plane (circular disk) with theme colors
+            const planeGeometry = new THREE.CircleGeometry(2, 32);
+            const planeMaterial = new THREE.MeshBasicMaterial({ 
+                color: 0xc8d8f0,
+                transparent: true, 
+                opacity: 0.3,
+                side: THREE.DoubleSide,
+                depthWrite: false
+            });
+            const equatorialPlane = new THREE.Mesh(planeGeometry, planeMaterial);
+            equatorialPlane.rotation.x = Math.PI / 2;
+
+            // Create X axis with theme color
+            const xAxisPoints = [
+                new THREE.Vector3(-2, 0, 0),
+                new THREE.Vector3(2, 0, 0)
+            ];
+            const xAxisGeometry = new THREE.BufferGeometry().setFromPoints(xAxisPoints);
+            const xAxisMaterial = new THREE.LineBasicMaterial({ color: 0x5a67d8, linewidth: 2 });
+            const xAxis = new THREE.Line(xAxisGeometry, xAxisMaterial);
+
+            // Create Y axis with theme color
+            const yAxisPoints = [
+                new THREE.Vector3(0, 0, -2),
+                new THREE.Vector3(0, 0, 2)
+            ];
+            const yAxisGeometry = new THREE.BufferGeometry().setFromPoints(yAxisPoints);
+            const yAxisMaterial = new THREE.LineBasicMaterial({ color: 0x5a67d8, linewidth: 2 });
+            const yAxis = new THREE.Line(yAxisGeometry, yAxisMaterial);
+
+            // Add plane and axes to the equatorial group
+            equatorialGroup.add(equatorialPlane);
+            equatorialGroup.add(xAxis);
+            equatorialGroup.add(yAxis);
+            scene.add(equatorialGroup);
+
+            function createTextTexture(text, color = '#5a67d8') {
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.width = 512;
+                canvas.height = 256;
+                
+                context.clearRect(0, 0, canvas.width, canvas.height);
+                
+                context.fillStyle = color;
+                context.font = '40px "Segoe UI", Tahoma, Geneva, Verdana, sans-serif';
+                context.textAlign = 'center';
+                context.textBaseline = 'alphabetic';
+                context.fillText(text, 256, 168);
+                
+                const texture = new THREE.CanvasTexture(canvas);
+                texture.generateMipmaps = false;
+                texture.minFilter = THREE.LinearFilter;
+                texture.magFilter = THREE.LinearFilter;
+                return texture;
+            }
+            
+            // Create labels
+            const oneTexture = createTextTexture('|1⟩', '#5a67d8');
+            const oneMaterial = new THREE.SpriteMaterial({ 
+                map: oneTexture,
+                sizeAttenuation: false,
+                transparent: true,
+                alphaTest: 0.1
+            });
+            const oneLabel = new THREE.Sprite(oneMaterial);
+            oneLabel.position.set(0, 2.3, 0);
+            oneLabel.scale.set(labelScaleFactor, labelScaleFactor * 0.5, 1);
+
+            const zeroTexture = createTextTexture('|0⟩', '#5a67d8');
+            const zeroMaterial = new THREE.SpriteMaterial({ 
+                map: zeroTexture,
+                sizeAttenuation: false,
+                transparent: true,
+                alphaTest: 0.1
+            });
+            const zeroLabel = new THREE.Sprite(zeroMaterial);
+            zeroLabel.position.set(0, -2.3, 0);
+            zeroLabel.scale.set(labelScaleFactor, labelScaleFactor * 0.5, 1);
+
+            const xTexture = createTextTexture('X', '#5a67d8');
+            const xMaterial = new THREE.SpriteMaterial({ 
+                map: xTexture,
+                sizeAttenuation: false,
+                transparent: true,
+                alphaTest: 0.1
+            });
+            const xLabel = new THREE.Sprite(xMaterial);
+            xLabel.position.set(2.3, 0.1, 0);
+            xLabel.scale.set(labelScaleFactor, labelScaleFactor * 0.5, 1);
+
+            const yTexture = createTextTexture('Y', '#5a67d8');
+            const yMaterial = new THREE.SpriteMaterial({ 
+                map: yTexture,
+                sizeAttenuation: false,
+                transparent: true,
+                alphaTest: 0.1
+            });
+            const yLabel = new THREE.Sprite(yMaterial);
+            yLabel.position.set(0, 0.1, -2.2);
+            yLabel.scale.set(labelScaleFactor, labelScaleFactor * 0.5, 1);
+
+            // Add labels to a group (these rotate with the sphere)
+            const labelGroup = new THREE.Group();
+            labelGroup.add(oneLabel);
+            labelGroup.add(zeroLabel);
+            labelGroup.add(xLabel);
+            labelGroup.add(yLabel);
+            scene.add(labelGroup);
+
+            // // Add qubit label (this stays stationary)
+            // const qubitTexture = createTextTexture(qubitLabel, '#8b5cf6');
+            // const qubitMaterial = new THREE.SpriteMaterial({ 
+            //     map: qubitTexture,
+            //     sizeAttenuation: false,
+            //     transparent: true,
+            //     alphaTest: 0.1
+            // });
+            // const qubitLabelSprite = new THREE.Sprite(qubitMaterial);
+            // qubitLabelSprite.position.set(0, -2.8, 0);
+            // qubitLabelSprite.scale.set(0.6, 0.3, 1);
+
+            // scene.add(qubitLabelSprite); // Add directly to scene, not labelGroup
+            
+            // Create arrow components
+            const redSphereGeometry = new THREE.SphereGeometry(0.06, 16, 16);
+            const redSphereMaterial = new THREE.MeshBasicMaterial({ color: 0x8b5cf6 });
+            const redSphere = new THREE.Mesh(redSphereGeometry, redSphereMaterial);
+
+            const arrowGroup = new THREE.Group();
+
+            const arrowPoints = [
+                new THREE.Vector3(0, 0, 0),
+                new THREE.Vector3(0, 1.95, 0)
+            ];
+            const arrowGeometry = new THREE.BufferGeometry().setFromPoints(arrowPoints);
+            const arrowMaterial = new THREE.LineBasicMaterial({ color: 0x8b5cf6, linewidth: 3 });
+            const arrowShaft = new THREE.Line(arrowGeometry, arrowMaterial);
+
+            const coneGeometry = new THREE.ConeGeometry(0.05, 0.15, 20);
+            const coneMaterial = new THREE.MeshBasicMaterial({ color: 0x8b5cf6 });
+            const arrowTip = new THREE.Mesh(coneGeometry, coneMaterial);
+            arrowTip.position.y = 1.93;
+
+            arrowGroup.add(arrowShaft);
+            arrowGroup.add(arrowTip);
+            arrowGroup.add(redSphere);
+            scene.add(arrowGroup);
+
+            // Add latitude and longitude lines
+            const lineGroup = new THREE.Group();
+            
+            // Latitude lines
+            for (let i = 0; i <= 10; i++) {
+                const phi = (i / 10) * Math.PI;
+                const points = [];
+                for (let j = 0; j <= 64; j++) {
+                    const theta = (j / 64) * Math.PI * 2;
+                    const x = 2 * Math.sin(phi) * Math.cos(theta);
+                    const y = 2 * Math.cos(phi);
+                    const z = 2 * Math.sin(phi) * Math.sin(theta);
+                    points.push(new THREE.Vector3(x, y, z));
+                }
+                const geometry = new THREE.BufferGeometry().setFromPoints(points);
+                const material = new THREE.LineBasicMaterial({ 
+                    color: 0xc8d8f0,
+                    opacity: 0.4, 
+                    transparent: true 
+                });
+                const line = new THREE.Line(geometry, material);
+                lineGroup.add(line);
+            }
+
+            // Longitude lines
+            for (let i = 0; i < 12; i++) {
+                const theta = (i / 12) * Math.PI * 2;
+                const points = [];
+                for (let j = 0; j <= 32; j++) {
+                    const phi = (j / 32) * Math.PI;
+                    const x = 2 * Math.sin(phi) * Math.cos(theta);
+                    const y = 2 * Math.cos(phi);
+                    const z = 2 * Math.sin(phi) * Math.sin(theta);
+                    points.push(new THREE.Vector3(x, y, z));
+                }
+                const geometry = new THREE.BufferGeometry().setFromPoints(points);
+                const material = new THREE.LineBasicMaterial({ 
+                    color: 0xc8d8f0,
+                    opacity: 0.4, 
+                    transparent: true 
+                });
+                const line = new THREE.Line(geometry, material);
+                lineGroup.add(line);
+            }
+
+            scene.add(lineGroup);
+
+            // Set initial arrow direction based on coordinates
+            updateArrowDirection(arrowGroup, coordinates);
+
+            camera.position.z = 4;
+
+            // Mouse controls for rotation - only when clicking on sphere
+            let isMouseDown = false;
+            let isRotatingAllowed = false;
+            let mouseX = 0, mouseY = 0;
+            let targetRotationX = 0, targetRotationY = 0;
+            let currentRotationX = 0, currentRotationY = 0;
+
+            // Raycaster for detecting sphere clicks
+            const raycaster = new THREE.Raycaster();
+            const mouse = new THREE.Vector2();
+
+            function updateMousePosition(event) {
+                // Calculate mouse position relative to the canvas
+                const canvasRect = renderer.domElement.getBoundingClientRect();
+                mouse.x = ((event.clientX - canvasRect.left) / canvasRect.width) * 2 - 1;
+                mouse.y = -((event.clientY - canvasRect.top) / canvasRect.height) * 2 + 1;
+            }
+
+            function isClickOnSphere(event) {
+                updateMousePosition(event);
+                
+                // Update the raycaster
+                raycaster.setFromCamera(mouse, camera);
+                
+                // Check for intersections with the sphere
+                const intersects = raycaster.intersectObject(sphere);
+                
+                return intersects.length > 0;
+            }
+
+            renderer.domElement.addEventListener('mousedown', (event) => {
+                // Only allow rotation if clicking on the sphere
+                if (isClickOnSphere(event)) {
+                    isMouseDown = true;
+                    isRotatingAllowed = true;
+                    mouseX = event.clientX;
+                    mouseY = event.clientY;
+                }
+            });
+
+            document.addEventListener('mouseup', () => {
+                isMouseDown = false;
+                isRotatingAllowed = false;
+            });
+
+            document.addEventListener('mousemove', (event) => {
+                if (isMouseDown && isRotatingAllowed) {
+                    const deltaX = event.clientX - mouseX;
+                    const deltaY = event.clientY - mouseY;
+                    
+                    targetRotationY += deltaX * 0.01;
+                    targetRotationX += deltaY * 0.01;
+                    
+                    targetRotationX = Math.max(-Math.PI/2, Math.min(Math.PI/2, targetRotationX));
+                    
+                    mouseX = event.clientX;
+                    mouseY = event.clientY;
+                }
+            });
+
+            // Animation loop
+            function animate() {
+                currentRotationX += (targetRotationX - currentRotationX) * 0.1;
+                currentRotationY += (targetRotationY - currentRotationY) * 0.1;
+                
+                sphere.rotation.x = currentRotationX;
+                sphere.rotation.y = currentRotationY;
+                lineGroup.rotation.x = currentRotationX;
+                lineGroup.rotation.y = currentRotationY;
+                arrowGroup.rotation.x = currentRotationX;
+                arrowGroup.rotation.y = currentRotationY;
+                equatorialGroup.rotation.x = currentRotationX;
+                equatorialGroup.rotation.y = currentRotationY;
+                labelGroup.rotation.x = currentRotationX;
+                labelGroup.rotation.y = currentRotationY;
+                
+                renderer.render(scene, camera);
+                requestAnimationFrame(animate);
+            }
+            animate();
+
+            return {
+                scene: scene,
+                renderer: renderer,
+                arrowGroup: arrowGroup,
+                animate: animate
+            };
+        }
+
+
+        function updateArrowDirection(arrowGroup, coordinates) {
+            // Normalize coordinates to unit sphere
+            const [x, y, z] = coordinates;
+            const length = Math.sqrt(x*x + y*y + z*z) || 1;
+            const norm = [x/length, y/length, z/length];
+            
+            // Convert Bloch coordinates to spherical coordinates
+            // Note: Bloch sphere has |0⟩ at north pole (0,0,1) and |1⟩ at south pole (0,0,-1)
+            const phi = Math.acos(norm[2]); // polar angle from +z axis
+            const theta = Math.atan2(norm[1], norm[0]); // azimuthal angle
+            
+            // Set arrow rotation
+            arrowGroup.rotation.x = 0;
+            arrowGroup.rotation.y = theta;
+            arrowGroup.rotation.z = phi;
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            // Recreate visualization if it exists
+            if (currentBlochSpheres.length > 0) {
+                // Could implement resize logic here if needed
+            }
+        });
+
+        // Welcome message
+        addToTerminal('Qiskit Quantum Simulator Ready');
+        addToTerminal('Enter your Qiskit code above and click "Run Code" or press Ctrl+Enter');
+        addToTerminal('Try multi-qubit circuits like: qc = QuantumCircuit(3)');
+    </script>
+</body>
+</html>

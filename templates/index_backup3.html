@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Quantum Bit Generator</title>
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background: linear-gradient(135deg, #e8f4fd 0%, #f0e6ff 100%);  /* Pale blue to lavender */
+            cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><circle cx="10" cy="10" r="2" fill="%23b794f6"/><ellipse cx="10" cy="10" rx="8" ry="3" fill="none" stroke="%235a67d8" stroke-width="1"/><ellipse cx="10" cy="10" rx="3" ry="8" fill="none" stroke="%235a67d8" stroke-width="1"/></svg>') 10 10, auto;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        body:active {
+            cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><circle cx="10" cy="10" r="2" fill="%23b794f6"/><ellipse cx="10" cy="10" rx="8" ry="3" fill="none" stroke="%235a67d8" stroke-width="1"/><ellipse cx="10" cy="10" rx="3" ry="8" fill="none" stroke="%235a67d8" stroke-width="1"/></svg>') 10 10, auto;
+        }
+        canvas { display: block; }
+        
+        /* Force atom cursor everywhere except text inputs */
+        * {
+            cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><circle cx="10" cy="10" r="2" fill="%23b794f6"/><ellipse cx="10" cy="10" rx="8" ry="3" fill="none" stroke="%235a67d8" stroke-width="1"/><ellipse cx="10" cy="10" rx="3" ry="8" fill="none" stroke="%235a67d8" stroke-width="1"/></svg>') 10 10, auto !important;
+        }
+
+        /* Text cursor only for input fields */
+        #terminal-input {
+            cursor: text !important;
+        }
+
+        /* Atom cursor for all terminal elements */
+        #terminal-container,
+        #terminal-header,
+        #terminal-body,
+        #terminal-output,
+        #terminal-input-line,
+        .terminal-buttons,
+        .btn,
+        .terminal-title,
+        .prompt {
+            cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><circle cx="10" cy="10" r="2" fill="%23b794f6"/><ellipse cx="10" cy="10" rx="8" ry="3" fill="none" stroke="%235a67d8" stroke-width="1"/><ellipse cx="10" cy="10" rx="3" ry="8" fill="none" stroke="%235a67d8" stroke-width="1"/></svg>') 10 10, auto !important;
+        }
+
+        /* Atom cursor for canvas and 3D elements */
+        canvas {
+            cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><circle cx="10" cy="10" r="2" fill="%23b794f6"/><ellipse cx="10" cy="10" rx="8" ry="3" fill="none" stroke="%235a67d8" stroke-width="1"/><ellipse cx="10" cy="10" rx="3" ry="8" fill="none" stroke="%235a67d8" stroke-width="1"/></svg>') 10 10, auto !important;
+        }
+        
+        /* Terminal styles */
+        #terminal-container {
+            position: absolute;
+            left: 20px;
+            top: 20px;
+            width: 25%;
+            height: 70%;
+            background: rgba(232, 244, 253, 0.95);  /* Pale blue background with transparency */
+            border-radius: 12px;
+            font-family: 'Courier New', monospace;
+            box-shadow: 0 8px 32px rgba(138, 143, 244, 0.3);  /* Enhanced lavender shadow */
+            backdrop-filter: blur(10px);  /* Glass effect */
+            display: flex;
+            flex-direction: column;
+            z-index: 1000;
+            border: 2px solid rgba(200, 216, 240, 0.8);  /* Soft blue border */
+        }
+
+        #terminal-header {
+            background: linear-gradient(135deg, #d6e7ff 0%, #e1d5f7 100%);  /* Blue to lavender gradient */
+            padding: 12px 18px;
+            border-radius: 12px 12px 0 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid rgba(200, 216, 240, 0.6);
+            box-shadow: 0 2px 8px rgba(138, 143, 244, 0.1);
+        }
+
+        .terminal-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .btn.red { background: linear-gradient(135deg, #ff9aa2 0%, #fecaca 100%); }
+        .btn.yellow { background: linear-gradient(135deg, #ffd3a5 0%, #fed7aa 100%); }
+        .btn.green { background: linear-gradient(135deg, #a8e6cf 0%, #bbf7d0 100%); }
+
+        .terminal-title {
+            color: #5a67d8;  /* Medium blue */
+            font-size: 13px;
+            font-weight: bold;
+            text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
+        }
+
+        #terminal-body {
+            flex: 1;
+            padding: 18px;
+            background: linear-gradient(135deg, #f7faff 0%, #faf5ff 100%);  /* Very pale blue to lavender */
+            border-radius: 0 0 12px 12px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #terminal-output {
+            flex: 1;
+            color: #4a5568;  /* Dark gray for readability */
+            font-size: 13px;
+            line-height: 1.5;
+            overflow-y: auto;
+            margin-bottom: 12px;
+            white-space: pre-wrap;
+            background: rgba(255, 255, 255, 0.7);  /* Semi-transparent white */
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            box-shadow: inset 0 2px 4px rgba(138, 143, 244, 0.05);
+        }
+
+        #terminal-input-line {
+            display: flex;
+            align-items: center;
+            color: #4a5568;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(214, 231, 255, 0.8);
+            box-shadow: 0 2px 8px rgba(138, 143, 244, 0.1);
+        }
+
+        .prompt {
+            color: #8b5cf6;  /* Lavender purple */
+            font-weight: bold;
+            margin-right: 8px;
+            text-shadow: 0 1px 2px rgba(139, 92, 246, 0.2);
+        }
+
+        #terminal-input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: #4a5568;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            outline: none;
+        }
+
+        #terminal-input::placeholder {
+            color: #a0aec0;  /* Light gray */
+        }
+
+        /* Enhanced scrollbar styling */
+        #terminal-output::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        #terminal-output::-webkit-scrollbar-track {
+            background: rgba(232, 244, 253, 0.5);
+            border-radius: 4px;
+        }
+
+        #terminal-output::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, #c8d8f0 0%, #b794f6 100%);
+            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        #terminal-output::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(135deg, #b794f6 0%, #8b5cf6 100%);
+        }
+    </style>
+</head>
+<body>
+    <div id="terminal-container">
+        <div id="terminal-header">
+            <div class="terminal-buttons">
+                <span class="btn red"></span>
+                <span class="btn yellow"></span>
+                <span class="btn green"></span>
+            </div>
+            <div class="terminal-title">Quantum Terminal</div>
+        </div>
+        <div id="terminal-body">
+            <div id="terminal-output"></div>
+            <div id="terminal-input-line">
+                <span class="prompt">quantum@bloch:~$ </span>
+                <input type="text" id="terminal-input" placeholder="Enter quantum commands..." autocomplete="off">
+            </div>
+        </div>
+    </div>
+
+    <!-- Load Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <script>
+        const scene = new THREE.Scene();
+
+        // Calculate canvas dimensions (70% width, positioned right)
+        const canvasWidth = window.innerWidth * 0.7;
+        const canvasHeight = window.innerHeight;
+
+        const camera = new THREE.PerspectiveCamera(75, canvasWidth/canvasHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(canvasWidth, canvasHeight);
+        renderer.setClearColor(0xf8f9fa, 0.1);  // Very light background with transparency
+        renderer.domElement.style.position = 'absolute';
+        renderer.domElement.style.right = '0';
+        document.body.appendChild(renderer.domElement);
+
+        // Create sphere with enhanced translucent material matching color scheme
+        const sphereGeometry = new THREE.SphereGeometry(2, 32, 32);
+        const sphereMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0xe0e1e3,
+            //color: 0xd6e7ff,  // Pale blue matching our theme
+            transparent: true, 
+            opacity: 0.3,
+            side: THREE.DoubleSide,
+            depthWrite: false
+        });
+        const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+        scene.add(sphere);
+
+        // Create a group for the equatorial elements
+        const equatorialGroup = new THREE.Group();
+
+        // Create equatorial plane (circular disk) with theme colors
+        const planeGeometry = new THREE.CircleGeometry(2, 32);
+        const planeMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0xc8d8f0,  // Lavender color
+            transparent: true, 
+            opacity: 0.2,
+            side: THREE.DoubleSide,
+            depthWrite: false
+        });
+        const equatorialPlane = new THREE.Mesh(planeGeometry, planeMaterial);
+        equatorialPlane.rotation.x = Math.PI / 2; // Rotate to lie flat (horizontal)
+
+        // Create X axis with theme color
+        const xAxisPoints = [
+            new THREE.Vector3(-2, 0, 0),
+            new THREE.Vector3(2, 0, 0)
+        ];
+        const xAxisGeometry = new THREE.BufferGeometry().setFromPoints(xAxisPoints);
+        const xAxisMaterial = new THREE.LineBasicMaterial({ color: 0x5a67d8, linewidth: 2 });
+        const xAxis = new THREE.Line(xAxisGeometry, xAxisMaterial);
+
+        // Create Y axis with theme color
+        const yAxisPoints = [
+            new THREE.Vector3(0, 0, -2),
+            new THREE.Vector3(0, 0, 2)
+        ];
+        const yAxisGeometry = new THREE.BufferGeometry().setFromPoints(yAxisPoints);
+        const yAxisMaterial = new THREE.LineBasicMaterial({ color: 0x5a67d8, linewidth: 2 });
+        const yAxis = new THREE.Line(yAxisGeometry, yAxisMaterial);
+
+        // Add plane and axes to the equatorial group
+        equatorialGroup.add(equatorialPlane);
+        equatorialGroup.add(xAxis);
+        equatorialGroup.add(yAxis);
+        scene.add(equatorialGroup);
+
+        function createTextTexture(text, color = '#5a67d8') {  // Default to theme blue
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = 512;  // Much larger canvas
+            canvas.height = 256; // Much larger canvas
+            
+            // Explicitly clear the canvas to be fully transparent
+            context.clearRect(0, 0, canvas.width, canvas.height);
+            
+            context.fillStyle = color;
+            context.font = 'bold 40px "Segoe UI", Tahoma, Geneva, Verdana, sans-serif';
+            context.textAlign = 'center';
+            context.textBaseline = 'alphabetic';
+            context.fillText(text, 256, 168);  // Centered in larger canvas
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.generateMipmaps = false;
+            texture.minFilter = THREE.LinearFilter;
+            texture.magFilter = THREE.LinearFilter;
+            return texture;
+        }
+
+        // Create |1⟩ label at top with theme color
+        const oneTexture = createTextTexture('|1⟩', '#5a67d8');
+        const oneMaterial = new THREE.SpriteMaterial({ 
+            map: oneTexture,
+            sizeAttenuation: false,
+            transparent: true,
+            alphaTest: 0.1
+        });
+        const oneLabel = new THREE.Sprite(oneMaterial);
+        oneLabel.position.set(0, 2.3, 0);
+        oneLabel.scale.set(0.5, 0.25, 1);
+
+        // Create |0⟩ label at bottom with theme color
+        const zeroTexture = createTextTexture('|0⟩', '#5a67d8');
+        const zeroMaterial = new THREE.SpriteMaterial({ 
+            map: zeroTexture,
+            sizeAttenuation: false,
+            transparent: true,
+            alphaTest: 0.1
+        });
+
+        const zeroLabel = new THREE.Sprite(zeroMaterial);
+        zeroLabel.position.set(0, -2.10, 0);
+        zeroLabel.scale.set(0.5, 0.25, 1);
+
+        const xTexture = createTextTexture('X', '#5a67d8');  // Lavender for X
+        const xMaterial = new THREE.SpriteMaterial({ 
+            map: xTexture,
+            sizeAttenuation: false,
+            transparent: true,
+            alphaTest: 0.1
+        });
+        const xLabel = new THREE.Sprite(xMaterial);
+        xLabel.position.set(2.2, 0.1, 0);
+        xLabel.scale.set(0.5, 0.25, 1);
+
+        // Create Y axis label with lavender color
+        const yTexture = createTextTexture('Y', '#5a67d8');
+        const yMaterial = new THREE.SpriteMaterial({ 
+            map: yTexture,
+            sizeAttenuation: false,
+            transparent: true,
+            alphaTest: 0.1
+        });
+        const yLabel = new THREE.Sprite(yMaterial);
+        yLabel.position.set(0, 0.1, -2.2);
+        yLabel.scale.set(0.5, 0.25, 1);
+
+        // Add labels to a group so they rotate with the sphere
+        const labelGroup = new THREE.Group();
+        labelGroup.add(oneLabel);
+        labelGroup.add(zeroLabel);
+        labelGroup.add(xLabel);
+        labelGroup.add(yLabel);
+        scene.add(labelGroup);
+
+        // Create smaller sphere at center with lavender color
+        const redSphereGeometry = new THREE.SphereGeometry(0.06, 16, 16);
+        const redSphereMaterial = new THREE.MeshBasicMaterial({ color: 0x8b5cf6 });  // Lavender
+        const redSphere = new THREE.Mesh(redSphereGeometry, redSphereMaterial);
+
+        // Create arrow group to keep shaft and tip together
+        const arrowGroup = new THREE.Group();
+
+        // Create arrow shaft with lavender color
+        const arrowPoints = [
+            new THREE.Vector3(0, 0, 0),
+            new THREE.Vector3(0, 1.95, 0)
+        ];
+        const arrowGeometry = new THREE.BufferGeometry().setFromPoints(arrowPoints);
+        const arrowMaterial = new THREE.LineBasicMaterial({ color: 0x8b5cf6, linewidth: 3 });  // Lavender
+        const arrowShaft = new THREE.Line(arrowGeometry, arrowMaterial);
+
+        // Create arrow cone tip with lavender color
+        const coneGeometry = new THREE.ConeGeometry(0.05, 0.15, 20);
+        const coneMaterial = new THREE.MeshBasicMaterial({ color: 0x8b5cf6 });  // Lavender
+        const arrowTip = new THREE.Mesh(coneGeometry, coneMaterial);
+        arrowTip.position.y = 1.93;
+
+        // Add components to arrow group
+        arrowGroup.add(arrowShaft);
+        arrowGroup.add(arrowTip);
+        arrowGroup.add(redSphere);
+        scene.add(arrowGroup);
+
+        // Add latitude and longitude lines with theme colors
+        const lineGroup = new THREE.Group();
+        
+        // Latitude lines
+        for (let i = 0; i <= 10; i++) {
+            const phi = (i / 10) * Math.PI;
+            const points = [];
+            for (let j = 0; j <= 64; j++) {
+                const theta = (j / 64) * Math.PI * 2;
+                const x = 2 * Math.sin(phi) * Math.cos(theta);
+                const y = 2 * Math.cos(phi);
+                const z = 2 * Math.sin(phi) * Math.sin(theta);
+                points.push(new THREE.Vector3(x, y, z));
+            }
+            const geometry = new THREE.BufferGeometry().setFromPoints(points);
+            const material = new THREE.LineBasicMaterial({ 
+                color: 0xc8d8f0,  // Soft blue
+                opacity: 0.4, 
+                transparent: true 
+            });
+            const line = new THREE.Line(geometry, material);
+            lineGroup.add(line);
+        }
+
+        // Longitude lines
+        for (let i = 0; i < 12; i++) {
+            const theta = (i / 12) * Math.PI * 2;
+            const points = [];
+            for (let j = 0; j <= 32; j++) {
+                const phi = (j / 32) * Math.PI;
+                const x = 2 * Math.sin(phi) * Math.cos(theta);
+                const y = 2 * Math.cos(phi);
+                const z = 2 * Math.sin(phi) * Math.sin(theta);
+                points.push(new THREE.Vector3(x, y, z));
+            }
+            const geometry = new THREE.BufferGeometry().setFromPoints(points);
+            const material = new THREE.LineBasicMaterial({ 
+                color: 0xc8d8f0,  // Soft blue
+                opacity: 0.4, 
+                transparent: true 
+            });
+            const line = new THREE.Line(geometry, material);
+            lineGroup.add(line);
+        }
+
+        scene.add(lineGroup);
+        camera.position.z = 5;
+
+        // Mouse controls for rotation
+        let isMouseDown = false;
+        let mouseX = 0, mouseY = 0;
+        let targetRotationX = 0, targetRotationY = 0;
+        let currentRotationX = 0, currentRotationY = 0;
+
+        document.addEventListener('mousedown', (event) => {
+            isMouseDown = true;
+            mouseX = event.clientX;
+            mouseY = event.clientY;
+        });
+
+        document.addEventListener('mouseup', () => {
+            isMouseDown = false;
+        });
+
+        document.addEventListener('mousemove', (event) => {
+            if (isMouseDown) {
+                const deltaX = event.clientX - mouseX;
+                const deltaY = event.clientY - mouseY;
+                
+                targetRotationY += deltaX * 0.01;
+                targetRotationX += deltaY * 0.01;
+                
+                targetRotationX = Math.max(-Math.PI/2, Math.min(Math.PI/2, targetRotationX));
+                
+                mouseX = event.clientX;
+                mouseY = event.clientY;
+            }
+        });
+
+        // Touch controls
+        let touchX = 0, touchY = 0;
+
+        function handleTouchStart(event) {
+            event.preventDefault();
+            if (event.touches.length === 1) {
+                touchX = event.touches[0].clientX;
+                touchY = event.touches[0].clientY;
+            }
+        }
+
+        function handleTouchMove(event) {
+            event.preventDefault();
+            if (event.touches.length === 1) {
+                const deltaX = event.touches[0].clientX - touchX;
+                const deltaY = event.touches[0].clientY - touchY;
+                
+                targetRotationY += deltaX * 0.01;
+                targetRotationX += deltaY * 0.01;
+                
+                targetRotationX = Math.max(-Math.PI/2, Math.min(Math.PI/2, targetRotationX));
+                
+                touchX = event.touches[0].clientX;
+                touchY = event.touches[0].clientY;
+            }
+        }
+
+        document.addEventListener('touchstart', handleTouchStart, { passive: false });
+        document.addEventListener('touchmove', handleTouchMove, { passive: false });
+
+        // Animation loop
+        function animate() {
+            currentRotationX += (targetRotationX - currentRotationX) * 0.1;
+            currentRotationY += (targetRotationY - currentRotationY) * 0.1;
+            
+            sphere.rotation.x = currentRotationX;
+            sphere.rotation.y = currentRotationY;
+            lineGroup.rotation.x = currentRotationX;
+            lineGroup.rotation.y = currentRotationY;
+            arrowGroup.rotation.x = currentRotationX;
+            arrowGroup.rotation.y = currentRotationY;
+            equatorialGroup.rotation.x = currentRotationX;
+            equatorialGroup.rotation.y = currentRotationY;
+            labelGroup.rotation.x = currentRotationX;
+            labelGroup.rotation.y = currentRotationY;
+            
+            renderer.render(scene, camera);
+            requestAnimationFrame(animate);
+        }
+        animate();
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            const canvasWidth = window.innerWidth * 0.7;
+            const canvasHeight = window.innerHeight;
+            
+            camera.aspect = canvasWidth / canvasHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(canvasWidth, canvasHeight);
+        });
+
+        // Backend API functions
+        async function applyGate(gateName) {
+            try {
+                const response = await fetch(`/api/quantum/gate/${gateName}`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    console.log(`Applied ${data.gate} gate`);
+                    animateArrowTo(data.new_state);
+                } else {
+                    console.error('Gate application failed:', data.error);
+                }
+            } catch (error) {
+                console.error('Error applying gate:', error);
+            }
+        }
+
+        async function getCurrentState() {
+            try {
+                const response = await fetch('/api/quantum/state');
+                const data = await response.json();
+                console.log('Current state:', data);
+                return data;
+            } catch (error) {
+                console.error('Error getting state:', error);
+            }
+        }
+
+        // Animation functions
+        function animateArrowTo(targetState) {
+            const duration = 1000;
+            const startTime = Date.now();
+            const startState = { x: 0, y: 1, z: 0 }; // Default start state
+            
+            function animate() {
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                
+                const eased = 1 - Math.pow(1 - progress, 3);
+                
+                const newState = {
+                    x: startState.x + (targetState.x - startState.x) * eased,
+                    y: startState.y + (targetState.y - startState.y) * eased,
+                    z: startState.z + (targetState.z - startState.z) * eased
+                };
+                
+                updateArrowDirection(newState);
+                
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                }
+            }
+            
+            animate();
+        }
+
+        function updateArrowDirection(direction) {
+            const length = Math.sqrt(direction.x * direction.x + direction.y * direction.y + direction.z * direction.z);
+            const norm = {
+                x: direction.x / length,
+                y: direction.y / length,
+                z: direction.z / length
+            };
+            
+            const phi = Math.acos(norm.y);
+            const theta = Math.atan2(norm.x, norm.z);
+            
+            arrowGroup.rotation.x = 0;
+            arrowGroup.rotation.y = theta;
+            arrowGroup.rotation.z = phi;
+        }
+
+        // Terminal functionality
+        const terminalOutput = document.getElementById('terminal-output');
+        const terminalInput = document.getElementById('terminal-input');
+
+        function addToTerminal(text, isCommand = false) {
+            const timestamp = new Date().toLocaleTimeString();
+            const prefix = isCommand ? `[${timestamp}] quantum@bloch:~$ ` : `[${timestamp}] `;
+            terminalOutput.textContent += prefix + text + '\n';
+            terminalOutput.scrollTop = terminalOutput.scrollHeight;
+        }
+
+        terminalInput.addEventListener('keydown', async (event) => {
+            if (event.key === 'Enter') {
+                const command = terminalInput.value.trim();
+                if (command) {
+                    addToTerminal(command, true);
+                    await handleTerminalCommand(command);
+                    terminalInput.value = '';
+                }
+            }
+        });
+
+        async function handleTerminalCommand(command) {
+            const cmd = command.toLowerCase();
+            
+            switch(cmd) {
+                case 'x':
+                case 'y':
+                case 'z':
+                case 'h':
+                    addToTerminal(`Applying ${cmd.toUpperCase()} gate...`);
+                    await applyGate(cmd.toUpperCase());
+                    break;
+                case 'reset':
+                    addToTerminal('Resetting to |1⟩ state...');
+                    await applyGate('reset');
+                    break;
+                case 'state':
+                    addToTerminal('Getting current quantum state...');
+                    const state = await getCurrentState();
+                    if (state) {
+                        addToTerminal(`State: α|0⟩ + β|1⟩`);
+                        addToTerminal(`P(|0⟩) = ${state.probabilities.zero.toFixed(3)}`);
+                        addToTerminal(`P(|1⟩) = ${state.probabilities.one.toFixed(3)}`);
+                    }
+                    break;
+                case 'help':
+                    addToTerminal('Available commands:');
+                    addToTerminal('  x, y, z, h - Apply quantum gates');
+                    addToTerminal('  reset - Reset to |1⟩ state');
+                    addToTerminal('  state - Show current state');
+                    addToTerminal('  clear - Clear terminal');
+                    break;
+                case 'clear':
+                    terminalOutput.textContent = '';
+                    break;
+                default:
+                    addToTerminal(`Unknown command: ${command}`);
+                    addToTerminal('Type "help" for available commands');
+            }
+        }
+
+        // Welcome message
+        addToTerminal('Quantum Bloch Sphere Terminal v1.0');
+        addToTerminal('Type "help" for available commands');
+    </script>
+</body>
+</html>
