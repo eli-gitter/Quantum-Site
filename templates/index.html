@@ -104,6 +104,17 @@
             box-shadow: 0 2px 8px rgba(138, 143, 244, 0.1);
         }
 
+        #display-header {
+            background: linear-gradient(135deg, #d6e7ff 0%, #e1d5f7 100%);
+            padding: 12px 18px;
+            border-radius: 12px 12px 0 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid rgba(200, 216, 240, 0.6);
+            box-shadow: 0 2px 8px rgba(138, 143, 244, 0.1);
+        }
+
         .code-title {
             color: #5a67d8;
             font-size: 13px;
@@ -267,17 +278,7 @@
             display: flex;
             flex-direction: column;
             z-index: 500;
-        }
-
-        #display-header {
-            background: linear-gradient(135deg, #d6e7ff 0%, #e1d5f7 100%);
-            padding: 12px 18px;
-            border-radius: 12px 12px 0 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-bottom: 1px solid rgba(200, 216, 240, 0.6);
-            box-shadow: 0 2px 8px rgba(138, 143, 244, 0.1);
+            font-family: 'Courier New', monospace;  /* Add this line */
         }
 
         .panel-title {
@@ -372,7 +373,7 @@
 
     <!-- Display Panel -->
     <div id="display-panel">
-        <div id="display-header">
+        <div id="code-header">
             <div class="code-title">Quantum State Visualization</div>
         </div>
         <div id="display-body">
@@ -398,7 +399,6 @@
         let currentBlochSpheres = [];
         let currentGridContainer = null;
 
-        // Backend API functions
         async function runQiskitCode(code) {
             try {
                 const response = await fetch('/execute', {
@@ -410,22 +410,14 @@
                 });
                 const data = await response.json();
                 
-
                 if (data.success) {
                     addToTerminal(`Code executed successfully`);
                     addToTerminal(`Detected ${data.num_qubits} qubit(s)`);
                     addToTerminal(`Found ${data.animation_sequence.length} steps`);
-    
-                    // For now, just show the final state (last step in sequence)
-                    const finalStep = data.animation_sequence[data.animation_sequence.length - 1];
-                    createMultiQubitVisualization(finalStep.bloch_data, data.grid_rows, data.grid_cols);
-    
-                    // Log each qubit's final state
-                    finalStep.bloch_data.forEach((qubit, index) => {
-                        const coords = qubit.coordinates;
-                        addToTerminal(`${qubit.label}: x=${coords[0].toFixed(3)}, y=${coords[1].toFixed(3)}, z=${coords[2].toFixed(3)}`);
-                    });
-
+                    
+                    // Start the step-by-step animation
+                    startAnimation(data.animation_sequence, data.grid_rows, data.grid_cols);
+                    
                 } else {
                     addToTerminal(`Error: ${data.error}`, true);
                 }
@@ -433,7 +425,6 @@
                 addToTerminal(`Connection error: ${error.message}`, true);
             }
         }
-
         // Initialize CodeMirror
         const codeEditor = CodeMirror(document.getElementById('code-input'), {
             mode: 'python',
@@ -443,19 +434,7 @@
             indentWithTabs: false,
             lineWrapping: true,
             value: ``,
-            placeholder: `Enter your Qiskit code here, for example:
-
-from qiskit import QuantumCircuit
-
-# Single qubit example
-qc = QuantumCircuit(1)
-qc.h(0)  # Hadamard gate
-
-# Multi-qubit example
-# qc = QuantumCircuit(3)
-# qc.h(0)
-# qc.x(1)
-# qc.ry(3.14159/4, 2)`,
+            placeholder: `Enter your Qiskit code here`,
             extraKeys: {
                 "Ctrl-Enter": function(cm) {
                     runButton.click();
@@ -925,6 +904,103 @@ qc.h(0)  # Hadamard gate
             arrowGroup.rotation.z = phi;
         }
 
+        let currentAnimationTimeout = null;
+
+        function startAnimation(animationSequence, gridRows, gridCols) {
+            // Clear any existing animation
+            if (currentAnimationTimeout) {
+                clearTimeout(currentAnimationTimeout);
+            }
+            
+            // Start with the first step
+            let currentStep = 0;
+            
+            function showNextStep() {
+                if (currentStep < animationSequence.length) {
+                    const stepData = animationSequence[currentStep];
+                    
+                    // Log the current step
+                    addToTerminal(`Step ${stepData.step}: ${stepData.gate_name}${stepData.target_qubits ? ' on qubit(s) ' + stepData.target_qubits.join(',') : ''}`);
+                    
+                    // Update visualization
+                    if (currentStep === 0) {
+                        // First step - create the visualization
+                        createMultiQubitVisualization(stepData.bloch_data, gridRows, gridCols);
+                    } else {
+                        // Subsequent steps - animate to new positions
+                        animateToNewPositions(stepData.bloch_data);
+                    }
+                    
+                    // Log coordinates for this step
+                    stepData.bloch_data.forEach((qubit) => {
+                        const coords = qubit.coordinates;
+                        addToTerminal(`  ${qubit.label}: x=${coords[0].toFixed(3)}, y=${coords[1].toFixed(3)}, z=${coords[2].toFixed(3)}`);
+                    });
+                    
+                    currentStep++;
+                    
+                    // Schedule next step (2 second delay)
+                    currentAnimationTimeout = setTimeout(showNextStep, 2000);
+                } else {
+                    addToTerminal(`Animation complete!`);
+                }
+            }
+            
+            // Start the animation
+            showNextStep();
+        }
+
+        function animateToNewPositions(newBlochData) {
+            // Update each sphere's arrow to the new position
+            currentBlochSpheres.forEach((sphereData, index) => {
+                if (index < newBlochData.length) {
+                    const newCoords = newBlochData[index].coordinates;
+                    animateArrowToPosition(sphereData.arrowGroup, newCoords);
+                }
+            });
+        }
+
+        function animateArrowToPosition(arrowGroup, targetCoords) {
+            // Get current rotation
+            const startRotationX = arrowGroup.rotation.x;
+            const startRotationY = arrowGroup.rotation.y;
+            const startRotationZ = arrowGroup.rotation.z;
+            
+            // Calculate target rotation from coordinates
+            const [x, y, z] = targetCoords;
+            const length = Math.sqrt(x*x + y*y + z*z) || 1;
+            const norm = [x/length, y/length, z/length];
+            
+            const targetPhi = Math.acos(norm[2]);
+            const targetTheta = Math.atan2(norm[1], norm[0]);
+            
+            const targetRotationX = 0;
+            const targetRotationY = targetTheta;
+            const targetRotationZ = targetPhi;
+            
+            // Animate over 1.5 seconds
+            const duration = 1500;
+            const startTime = Date.now();
+            
+            function updateRotation() {
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                
+                // Smooth easing function
+                const easeProgress = 1 - Math.pow(1 - progress, 3);
+                
+                // Interpolate rotations
+                arrowGroup.rotation.x = startRotationX + (targetRotationX - startRotationX) * easeProgress;
+                arrowGroup.rotation.y = startRotationY + (targetRotationY - startRotationY) * easeProgress;
+                arrowGroup.rotation.z = startRotationZ + (targetRotationZ - startRotationZ) * easeProgress;
+                
+                if (progress < 1) {
+                    requestAnimationFrame(updateRotation);
+                }
+            }
+            
+            updateRotation();
+        }
         // Handle window resize
         window.addEventListener('resize', () => {
             // Recreate visualization if it exists
@@ -936,7 +1012,6 @@ qc.h(0)  # Hadamard gate
         // Welcome message
         addToTerminal('Qiskit Quantum Simulator Ready');
         addToTerminal('Enter your Qiskit code above and click "Run Code" or press Ctrl+Enter');
-        addToTerminal('Try multi-qubit circuits like: qc = QuantumCircuit(3)');
     </script>
 </body>
 </html>
