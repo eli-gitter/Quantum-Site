@@ -410,18 +410,22 @@
                 });
                 const data = await response.json();
                 
+
                 if (data.success) {
                     addToTerminal(`Code executed successfully`);
                     addToTerminal(`Detected ${data.num_qubits} qubit(s)`);
-                    
-                    // Create multi-qubit visualization
-                    createMultiQubitVisualization(data.bloch_data, data.grid_rows, data.grid_cols);
-                    
-                    // Log each qubit state
-                    data.bloch_data.forEach((qubit, index) => {
+                    addToTerminal(`Found ${data.animation_sequence.length} steps`);
+    
+                    // For now, just show the final state (last step in sequence)
+                    const finalStep = data.animation_sequence[data.animation_sequence.length - 1];
+                    createMultiQubitVisualization(finalStep.bloch_data, data.grid_rows, data.grid_cols);
+    
+                    // Log each qubit's final state
+                    finalStep.bloch_data.forEach((qubit, index) => {
                         const coords = qubit.coordinates;
                         addToTerminal(`${qubit.label}: x=${coords[0].toFixed(3)}, y=${coords[1].toFixed(3)}, z=${coords[2].toFixed(3)}`);
                     });
+
                 } else {
                     addToTerminal(`Error: ${data.error}`, true);
                 }
