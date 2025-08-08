@@ -8,16 +8,62 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/material-lighter.min.css">
     
     <style>
-        /* Your existing styles stay the same... */
         body { 
             margin: 0; 
             overflow: hidden; 
             background: linear-gradient(135deg, #e8f4fd 0%, #d3cedc 100%);
             cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><circle cx="10" cy="10" r="2" fill="%23b794f6"/><ellipse cx="10" cy="10" rx="8" ry="3" fill="none" stroke="%235a67d8" stroke-width="1"/><ellipse cx="10" cy="10" rx="3" ry="8" fill="none" stroke="%235a67d8" stroke-width="1"/></svg>') 10 10, auto;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            height: 100vh;
         }
         
-        /* Add CodeMirror custom styling */
+        /* Main layout container */
+        #main-container {
+            display: grid;
+            grid-template-columns: var(--left-width, 35%) 4px 1fr;
+            grid-template-rows: 100vh;
+            height: 100vh;
+            width: 100vw;
+            min-width: 800px;
+        }
+        
+        /* Left column container */
+        #left-container {
+            display: grid;
+            grid-template-rows: var(--code-height, 50%) 4px 1fr;
+            padding: 0px 0 0px 0px;
+            gap: 0;
+        }
+        
+        /* Right column container */
+        #right-container {
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* Resize handles */
+        .resize-handle {
+            background: linear-gradient(135deg, #c8d8f0 0%, #b794f6 100%);
+            position: relative;
+            transition: background 0.2s ease;
+        }
+        
+        .resize-handle:hover {
+            background: linear-gradient(135deg, #b794f6 0%, #8b5cf6 100%);
+        }
+        
+        .resize-handle-vertical {
+            cursor: col-resize;
+            background: linear-gradient(to right, transparent 1px, #c8d8f0 1px, #b794f6 3px, transparent 3px);
+        }
+        
+        .resize-handle-horizontal {
+            cursor: row-resize;
+            background: linear-gradient(to bottom, transparent 1px, #c8d8f0 1px, #b794f6 3px, transparent 3px);
+        }
+        
+        /* CodeMirror custom styling */
         .CodeMirror {
             height: 100% !important;
             font-family: 'Courier New', monospace !important;
@@ -35,19 +81,16 @@
             background: rgba(90, 103, 216, 0.2) !important;
         }
         
-        /* Keep all your existing styles... */
-
+        /* Cursor styles */
         body:active {
             cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><circle cx="10" cy="10" r="2" fill="%23b794f6"/><ellipse cx="10" cy="10" rx="8" ry="3" fill="none" stroke="%235a67d8" stroke-width="1"/><ellipse cx="10" cy="10" rx="3" ry="8" fill="none" stroke="%235a67d8" stroke-width="1"/></svg>') 10 10, auto;
         }
         canvas { display: block; }
         
-        /* Force atom cursor everywhere except text inputs */
         * {
             cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><circle cx="10" cy="10" r="2" fill="%23b794f6"/><ellipse cx="10" cy="10" rx="8" ry="3" fill="none" stroke="%235a67d8" stroke-width="1"/><ellipse cx="10" cy="10" rx="3" ry="8" fill="none" stroke="%235a67d8" stroke-width="1"/></svg>') 10 10, auto !important;
         }
 
-        /* Text cursor only for CodeMirror editor */
         .CodeMirror, .CodeMirror * {
             cursor: text !important;
         }
@@ -56,44 +99,28 @@
             cursor: text !important;
         }
 
-        /* Atom cursor for all terminal elements */
-        #terminal-container,
-        #terminal-header,
-        #terminal-body,
-        #terminal-output,
-        .terminal-buttons,
-        .btn,
-        .terminal-title,
-        #code-container,
-        #code-header,
-        #code-body {
+        /* Atom cursor for all elements */
+        .panel, .panel-header, .panel-body, .resize-handle {
             cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><circle cx="10" cy="10" r="2" fill="%23b794f6"/><ellipse cx="10" cy="10" rx="8" ry="3" fill="none" stroke="%235a67d8" stroke-width="1"/><ellipse cx="10" cy="10" rx="3" ry="8" fill="none" stroke="%235a67d8" stroke-width="1"/></svg>') 10 10, auto !important;
         }
 
-        /* Atom cursor for canvas and 3D elements */
         canvas {
             cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><circle cx="10" cy="10" r="2" fill="%23b794f6"/><ellipse cx="10" cy="10" rx="8" ry="3" fill="none" stroke="%235a67d8" stroke-width="1"/><ellipse cx="10" cy="10" rx="3" ry="8" fill="none" stroke="%235a67d8" stroke-width="1"/></svg>') 10 10, auto !important;
         }
         
-        /* Code Input Container */
-        #code-container {
-            position: absolute;
-            left: 50px;
-            top: 30px;
-            width: 35%;
-            height: 45%;
+        /* Panel styles */
+        .panel {
             background: rgba(232, 244, 253, 0.95);
             border-radius: 12px;
-            font-family: 'Courier New', monospace;
             box-shadow: 0 8px 32px rgba(138, 143, 244, 0.3);
             backdrop-filter: blur(10px);
             display: flex;
             flex-direction: column;
-            z-index: 1000;
             border: 2px solid rgba(200, 216, 240, 0.8);
+            min-height: 0;
         }
-
-        #code-header {
+        
+        .panel-header {
             background: linear-gradient(135deg, #d6e7ff 0%, #e1d5f7 100%);
             padding: 12px 18px;
             border-radius: 12px 12px 0 0;
@@ -102,27 +129,25 @@
             justify-content: space-between;
             border-bottom: 1px solid rgba(200, 216, 240, 0.6);
             box-shadow: 0 2px 8px rgba(138, 143, 244, 0.1);
+            flex-shrink: 0;
         }
 
-        #display-header {
-            background: linear-gradient(135deg, #d6e7ff 0%, #e1d5f7 100%);
-            padding: 12px 18px;
-            border-radius: 12px 12px 0 0;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            border-bottom: 1px solid rgba(200, 216, 240, 0.6);
-            box-shadow: 0 2px 8px rgba(138, 143, 244, 0.1);
-        }
-
-        .code-title {
+        .panel-title {
             color: #5a67d8;
             font-size: 13px;
             font-weight: bold;
             text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
         }
+        
+        .panel-subtitle {
+            color: #5e4e82;
+            font-size: 13px;
+            font-weight: 300;
+            margin-left: 10px;
+            text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
+        }
 
-        #code-body {
+        .panel-body {
             flex: 1;
             padding: 18px;
             background: linear-gradient(135deg, #f7faff 0%, #faf5ff 100%);
@@ -130,25 +155,17 @@
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            min-height: 0;
+        }
+
+        /* Code panel specific styles */
+        #code-container {
+            font-family: 'Courier New', monospace;
         }
 
         #code-input {
             flex: 1;
-            background: rgba(255, 255, 255, 0.9);
-            border: 1px solid rgba(214, 231, 255, 0.8);
-            border-radius: 8px;
-            padding: 12px;
-            font-family: 'Courier New', monospace;
-            font-size: 13px;
-            color: #4a5568;
-            resize: none;
-            outline: none;
-            box-shadow: 0 2px 8px rgba(138, 143, 244, 0.1);
-            margin-bottom: 10px;
-        }
-
-        #code-input::placeholder {
-            color: #a0aec0;
+            min-height: 0;
         }
 
         #run-button {
@@ -163,6 +180,8 @@
             cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><circle cx="10" cy="10" r="2" fill="%23b794f6"/><ellipse cx="10" cy="10" rx="8" ry="3" fill="none" stroke="%235a67d8" stroke-width="1"/><ellipse cx="10" cy="10" rx="3" ry="8" fill="none" stroke="%235a67d8" stroke-width="1"/></svg>') 10 10, auto !important;
             box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
             transition: all 0.2s ease;
+            margin-top: 10px;
+            flex-shrink: 0;
         }
 
         #run-button:hover {
@@ -171,62 +190,9 @@
             box-shadow: 0 6px 16px rgba(139, 92, 246, 0.4);
         }
 
-        /* Terminal Output Container */
+        /* Terminal panel specific styles */
         #terminal-container {
-            position: absolute;
-            left: 50px;
-            bottom: 30px;
-            width: 35%;
-            height: 45%;
-            background: rgba(232, 244, 253, 0.95);
-            border-radius: 12px;
             font-family: 'Courier New', monospace;
-            box-shadow: 0 8px 32px rgba(138, 143, 244, 0.3);
-            backdrop-filter: blur(10px);
-            display: flex;
-            flex-direction: column;
-            z-index: 1000;
-            border: 2px solid rgba(200, 216, 240, 0.8);
-        }
-
-        #terminal-header {
-            background: linear-gradient(135deg, #d6e7ff 0%, #e1d5f7 100%);
-            padding: 12px 18px;
-            border-radius: 12px 12px 0 0;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            border-bottom: 1px solid rgba(200, 216, 240, 0.6);
-            box-shadow: 0 2px 8px rgba(138, 143, 244, 0.1);
-        }
-
-        .terminal-buttons {
-            display: flex;
-            gap: 8px;
-        }
-
-        .btn {
-            width: 14px;
-            height: 14px;
-            border-radius: 50%;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-
-        .terminal-title {
-            color: #5a67d8;
-            font-size: 13px;
-            font-weight: bold;
-            text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
-        }
-
-        #terminal-body {
-            flex: 1;
-            padding: 18px;
-            background: linear-gradient(135deg, #f7faff 0%, #faf5ff 100%);
-            border-radius: 0 0 12px 12px;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
         }
 
         #terminal-output {
@@ -241,68 +207,36 @@
             border-radius: 8px;
             border: 1px solid rgba(226, 232, 240, 0.8);
             box-shadow: inset 0 2px 4px rgba(138, 143, 244, 0.05);
+            min-height: 0;
         }
 
-        /* Enhanced scrollbar styling */
-        #terminal-output::-webkit-scrollbar, #code-input::-webkit-scrollbar {
-            width: 8px;
-        }
-
-        #terminal-output::-webkit-scrollbar-track, #code-input::-webkit-scrollbar-track {
-            background: rgba(232, 244, 253, 0.5);
-            border-radius: 4px;
-        }
-
-        #terminal-output::-webkit-scrollbar-thumb, #code-input::-webkit-scrollbar-thumb {
-            background: linear-gradient(135deg, #c8d8f0 0%, #b794f6 100%);
-            border-radius: 4px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-
-        #terminal-output::-webkit-scrollbar-thumb:hover, #code-input::-webkit-scrollbar-thumb:hover {
-            background: linear-gradient(135deg, #b794f6 0%, #8b5cf6 100%);
-        }
-
-        /* Display Panel */
-        #display-panel {
-            position: absolute;
-            right: 50px;
-            top: 30px;
-            bottom: 30px;
-            left: 45%;
-            background: rgba(232, 244, 253, 0.95);
-            border-radius: 12px;
-            box-shadow: 0 8px 32px rgba(138, 143, 244, 0.3);
-            backdrop-filter: blur(10px);
-            border: 2px solid rgba(200, 216, 240, 0.8);
-            display: flex;
-            flex-direction: column;
-            z-index: 500;
-            font-family: 'Courier New', monospace;  /* Add this line */
-        }
-
-        .panel-title {
-            color: #5a67d8;
-            font-size: 13px;
-            font-weight: bold;
-            text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
+        /* Display panel specific styles */
+        #display-container {
+            font-family: 'Courier New', monospace;
+            flex: 1;
+            margin: 0;
+            height: 100%;
         }
 
         #display-body {
-            flex: 1;
+            padding: 18px;  /* Keep the padding */
             position: relative;
             overflow: visible;
-            border-radius: 0 0 12px 12px;
-            background: linear-gradient(135deg, #f7faff 0%, #faf5ff 100%);
+            height: 100%;
+            box-sizing: border-box;
         }
 
         #canvas-container {
             position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            overflow: visible;
+            top: 18px;
+            left: 18px;
+            right: 18px;
+            bottom: 18px;
+            overflow: hidden;
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 8px;
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            box-shadow: inset 0 2px 4px rgba(138, 143, 244, 0.05);
         }
 
         #welcome-message {
@@ -328,15 +262,36 @@
             font-style: italic;
         }
 
+        /* Scrollbar styles */
+        #terminal-output::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        #terminal-output::-webkit-scrollbar-track {
+            background: rgba(232, 244, 253, 0.5);
+            border-radius: 4px;
+        }
+
+        #terminal-output::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, #c8d8f0 0%, #b794f6 100%);
+            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        #terminal-output::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(135deg, #b794f6 0%, #8b5cf6 100%);
+        }
+
         /* Multi-qubit grid styles */
         .qubit-grid {
             display: grid;
-            gap: 0px;
-            padding: 0px;
+            gap: 10px;
+            padding: 10px;
             height: 100%;
             width: 100%;
             box-sizing: border-box;
             place-items: center;
+            overflow: hidden;
         }
 
         .qubit-grid > div {
@@ -347,54 +302,209 @@
             height: 100%;
         }
 
-    </style>
+
+</style>
 </head>
 <body>
-    <!-- Code Input Container -->
-    <div id="code-container">
-        <div id="code-header">
-            <div class="code-title">Qiskit Code Editor</div>
+    <div id="main-container">
+        <!-- Left container with code editor and terminal -->
+        <div id="left-container">
+            <!-- Code Input Container -->
+            <div id="code-container" class="panel">
+                <div class="panel-header">
+                    <div class="panel-title">Qiskit Code Editor</div>
+                </div>
+                <div class="panel-body">
+                    <div id="code-input"></div>
+                    <button id="run-button">▶ Run Code</button>
+                </div>
+            </div>
+            
+            <!-- Horizontal resize handle -->
+            <div class="resize-handle resize-handle-horizontal" id="horizontal-resize"></div>
+            
+            <!-- Terminal Output Container -->
+            <div id="terminal-container" class="panel">
+                <div class="panel-header">
+                    <div class="panel-title">Output Terminal</div>
+                </div>
+                <div class="panel-body">
+                    <div id="terminal-output"></div>
+                </div>
+            </div>
         </div>
-        <div id="code-body">
-            <div id="code-input"></div>
-            <button id="run-button">▶ Run Code</button>
-        </div>
-    </div>
-
-    <!-- Terminal Output Container -->
-    <div id="terminal-container">
-        <div id="terminal-header">
-            <div class="terminal-title">Output Terminal</div>
-        </div>
-        <div id="terminal-body">
-            <div id="terminal-output"></div>
-        </div>
-    </div>
-
-    <!-- Display Panel -->
-    <div id="display-panel">
-        <div id="code-header">
-            <div class="code-title">Quantum State Visualization</div>
-        </div>
-        <div id="display-body">
-            <div id="canvas-container">
-                <div id="welcome-message">
-                    <div>Welcome to Quantum Visualizer</div>
-                    <div class="subtitle">Run quantum code to see Bloch sphere visualization</div>
+        
+        <!-- Vertical resize handle -->
+        <div class="resize-handle resize-handle-vertical" id="vertical-resize"></div>
+        
+        <!-- Right container with display panel -->
+        <div id="right-container">
+            <div id="display-container" class="panel">
+                <div class="panel-header">
+                    <div class="panel-title">Quantum State Visualization
+                        <span class="panel-subtitle">(Click and drag on Bloch Spheres to rotate)</span>
+                    </div>
+                </div>
+                <div id="display-body" class="panel-body">
+                    <div id="canvas-container">
+                        <div id="welcome-message">
+                            <div>Welcome to Quantum Visualizer</div>
+                            <div class="subtitle">Run quantum code to see Bloch sphere visualization</div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-<!-- Load Three.js -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Load Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
-<!-- Add CodeMirror JavaScript -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/python/python.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/display/placeholder.min.js"></script>
+    <!-- Add CodeMirror JavaScript -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/python/python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/display/placeholder.min.js"></script>
     
     <script>
+        // Resize functionality
+        let isResizing = false;
+        let currentHandle = null;
+        
+        // Default layout percentages
+        let leftWidth = 35;
+        let codeHeight = 50;
+        
+        // Minimum sizes (in pixels)
+        const MIN_LEFT_WIDTH = 300;
+        const MIN_RIGHT_WIDTH = 400;
+        const MIN_CODE_HEIGHT = 150;
+        const MIN_TERMINAL_HEIGHT = 100;
+        
+        function initializeResizeHandles() {
+            const verticalHandle = document.getElementById('vertical-resize');
+            const horizontalHandle = document.getElementById('horizontal-resize');
+            
+            // Vertical resize (between left and right panels)
+            verticalHandle.addEventListener('mousedown', (e) => {
+                isResizing = true;
+                currentHandle = 'vertical';
+                document.body.style.cursor = 'col-resize';
+                e.preventDefault();
+            });
+            
+            // Horizontal resize (between code editor and terminal)
+            horizontalHandle.addEventListener('mousedown', (e) => {
+                isResizing = true;
+                currentHandle = 'horizontal';
+                document.body.style.cursor = 'row-resize';
+                e.preventDefault();
+            });
+            
+            // Global mouse move handler
+            document.addEventListener('mousemove', (e) => {
+                if (!isResizing) return;
+                
+                if (currentHandle === 'vertical') {
+                    handleVerticalResize(e);
+                } else if (currentHandle === 'horizontal') {
+                    handleHorizontalResize(e);
+                }
+            });
+            
+            // Global mouse up handler
+            document.addEventListener('mouseup', () => {
+                if (isResizing) {
+                    isResizing = false;
+                    currentHandle = null;
+                    document.body.style.cursor = '';
+                    
+                    // Trigger resize event for Three.js canvases
+                    setTimeout(() => {
+                        if (currentBlochSpheres.length > 0) {
+                            window.dispatchEvent(new Event('resize'));
+                        }
+                        
+                        // Refresh CodeMirror
+                        if (codeEditor) {
+                            setTimeout(() => codeEditor.refresh(), 100);
+                        }
+                    }, 100);
+                }
+            });
+        }
+        
+        function handleVerticalResize(e) {
+            const containerWidth = window.innerWidth;
+            const newLeftWidth = (e.clientX / containerWidth) * 100;
+            
+            // Check minimum sizes
+            const leftPx = (newLeftWidth / 100) * containerWidth;
+            const rightPx = containerWidth - leftPx - 4; // 4px for handle
+            
+            if (leftPx >= MIN_LEFT_WIDTH && rightPx >= MIN_RIGHT_WIDTH) {
+                leftWidth = newLeftWidth;
+                updateLayout();
+            }
+        }
+        
+        function handleHorizontalResize(e) {
+            const leftContainer = document.getElementById('left-container');
+            const rect = leftContainer.getBoundingClientRect();
+            const containerHeight = rect.height - 4; // 4px for handle
+            const relativeY = e.clientY - rect.top;
+            const newCodeHeight = (relativeY / containerHeight) * 100;
+            
+            // Check minimum sizes
+            const codePx = (newCodeHeight / 100) * containerHeight;
+            const terminalPx = containerHeight - codePx;
+            
+            if (codePx >= MIN_CODE_HEIGHT && terminalPx >= MIN_TERMINAL_HEIGHT) {
+                codeHeight = newCodeHeight;
+                updateLayout();
+            }
+        }
+        
+        function updateLayout() {
+            document.documentElement.style.setProperty('--left-width', leftWidth + '%');
+            document.documentElement.style.setProperty('--code-height', codeHeight + '%');
+        }
+        
+        function recreateBlochSpheres() {
+            if (!currentGridContainer || currentBlochData.length === 0) return;
+            
+            const canvasContainer = document.getElementById('canvas-container');
+            const containerRect = canvasContainer.getBoundingClientRect();
+            const padding = 10;
+            
+            // Calculate new sphere size
+            const availableWidth = (containerRect.width - padding * (currentGridCols + 1)) / currentGridCols;
+            const availableHeight = (containerRect.height - padding * (currentGridRows + 1)) / currentGridRows;
+            const newSphereSize = Math.min(availableWidth, availableHeight, 1000);
+            
+            // Clear existing spheres but keep the grid container
+            currentBlochSpheres.forEach(sphere => {
+                if (sphere.renderer) {
+                    sphere.renderer.domElement.parentElement.remove();
+                    sphere.renderer.dispose();
+                }
+            });
+            currentBlochSpheres = [];
+            
+            // Clear grid container children
+            while (currentGridContainer.firstChild) {
+                currentGridContainer.removeChild(currentGridContainer.firstChild);
+            }
+            
+            // Recreate spheres with new size
+            currentBlochData.forEach((qubitData, index) => {
+                createSingleBlochSphere(currentGridContainer, qubitData, newSphereSize);
+            });
+        }
+
+        // Initialize layout on load
+        updateLayout();
+        initializeResizeHandles();
+
         // Global variables for multi-qubit support
         let currentBlochSpheres = [];
         let currentGridContainer = null;
@@ -411,9 +521,7 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    addToTerminal(`Code executed successfully`);
                     addToTerminal(`Detected ${data.num_qubits} qubit(s)`);
-                    addToTerminal(`Found ${data.animation_sequence.length} steps`);
                     
                     // Start the step-by-step animation
                     startAnimation(data.animation_sequence, data.grid_rows, data.grid_cols);
@@ -425,6 +533,7 @@
                 addToTerminal(`Connection error: ${error.message}`, true);
             }
         }
+
         // Initialize CodeMirror
         const codeEditor = CodeMirror(document.getElementById('code-input'), {
             mode: 'python',
@@ -447,8 +556,7 @@
         const runButton = document.getElementById('run-button');
 
         function addToTerminal(text, isError = false) {
-            const timestamp = new Date().toLocaleTimeString();
-            const prefix = `[${timestamp}] `;
+            const prefix = `ψ> `;
             const color = isError ? 'color: #e53e3e;' : '';
             terminalOutput.innerHTML += `<span style="${color}">${prefix}${text}</span>\n`;
             terminalOutput.scrollTop = terminalOutput.scrollHeight;
@@ -465,10 +573,19 @@
             }
         });
 
-        // Multi-qubit visualization functions
+        // Add these global variables at the top with the others
+        let currentGridRows = 1;
+        let currentGridCols = 1;
+        let currentBlochData = [];
+
         function createMultiQubitVisualization(blochData, gridRows, gridCols) {
             const canvasContainer = document.getElementById('canvas-container');
             const welcomeMessage = document.getElementById('welcome-message');
+            
+            // Store grid information for resize
+            currentGridRows = gridRows;
+            currentGridCols = gridCols;
+            currentBlochData = blochData;
             
             // Hide welcome message
             if (welcomeMessage) {
@@ -489,17 +606,24 @@
             
             // Calculate sphere size based on grid
             const containerRect = canvasContainer.getBoundingClientRect();
-            const maxSphereSize = Math.min(
-                (containerRect.width) / gridCols,
-                (containerRect.height) / gridRows
-            );
+            const padding = 10; // Reduced padding
+            
+            // Calculate available space per cell
+            const availableWidth = (containerRect.width - padding * (gridCols + 1)) / gridCols;
+            const availableHeight = (containerRect.height - padding * (gridRows + 1)) / gridRows;
+            
+            // Use the smaller dimension to ensure spheres fit
+            const sphereSize = Math.min(availableWidth, availableHeight, 400); // Cap at 400px max
+            
+            // Add padding to grid
+            gridContainer.style.padding = `${padding}px`;
+            gridContainer.style.gap = `${padding}px`;
             
             // Create Bloch sphere for each qubit
             blochData.forEach((qubitData, index) => {
-                createSingleBlochSphere(gridContainer, qubitData, maxSphereSize);
+                createSingleBlochSphere(gridContainer, qubitData, sphereSize);
             });
         }
-
         function clearExistingVisualization() {
             // Dispose of existing Three.js resources
             currentBlochSpheres.forEach(sphere => {
@@ -705,20 +829,6 @@
             labelGroup.add(xLabel);
             labelGroup.add(yLabel);
             scene.add(labelGroup);
-
-            // // Add qubit label (this stays stationary)
-            // const qubitTexture = createTextTexture(qubitLabel, '#8b5cf6');
-            // const qubitMaterial = new THREE.SpriteMaterial({ 
-            //     map: qubitTexture,
-            //     sizeAttenuation: false,
-            //     transparent: true,
-            //     alphaTest: 0.1
-            // });
-            // const qubitLabelSprite = new THREE.Sprite(qubitMaterial);
-            // qubitLabelSprite.position.set(0, -2.8, 0);
-            // qubitLabelSprite.scale.set(0.6, 0.3, 1);
-
-            // scene.add(qubitLabelSprite); // Add directly to scene, not labelGroup
             
             // Create arrow components
             const redSphereGeometry = new THREE.SphereGeometry(0.06, 16, 16);
@@ -886,7 +996,6 @@
             };
         }
 
-
         function updateArrowDirection(arrowGroup, coordinates) {
             // Normalize coordinates to unit sphere
             const [x, y, z] = coordinates;
@@ -905,6 +1014,7 @@
         }
 
         let currentAnimationTimeout = null;
+        let previousCoordinates = {};
 
         function startAnimation(animationSequence, gridRows, gridCols) {
             // Clear any existing animation
@@ -914,7 +1024,9 @@
             
             // Start with the first step
             let currentStep = 0;
-            
+
+            // Declare previousCoordinates outside the function
+
             function showNextStep() {
                 if (currentStep < animationSequence.length) {
                     const stepData = animationSequence[currentStep];
@@ -924,33 +1036,45 @@
                     
                     // Update visualization
                     if (currentStep === 0) {
-                        // First step - create the visualization
                         createMultiQubitVisualization(stepData.bloch_data, gridRows, gridCols);
                     } else {
-                        // Subsequent steps - animate to new positions
                         animateToNewPositions(stepData.bloch_data);
                     }
                     
-                    // Log coordinates for this step
-                    stepData.bloch_data.forEach((qubit) => {
-                        const coords = qubit.coordinates;
-                        addToTerminal(`  ${qubit.label}: x=${coords[0].toFixed(3)}, y=${coords[1].toFixed(3)}, z=${coords[2].toFixed(3)}`);
-                    });
+                    // Print coordinates
+                    if (currentStep === 0) {
+                        // Initial step - print all qubits
+                        stepData.bloch_data.forEach((qubit) => {
+                            const coords = qubit.coordinates;
+                            addToTerminal(`  ${qubit.label}: x=${coords[0].toFixed(3)}, y=${coords[1].toFixed(3)}, z=${coords[2].toFixed(3)}`);
+                        });
+                    } else {
+                        // Subsequent steps - only print target qubits
+                        if (stepData.target_qubits && stepData.target_qubits.length > 0) {
+                            stepData.bloch_data.forEach((qubit) => {
+                                // Check if this qubit is in the target_qubits array
+                                if (stepData.target_qubits.includes(parseInt(qubit.label.replace('Qubit ', '')))) {
+                                    const coords = qubit.coordinates;
+                                    addToTerminal(`  ${qubit.label}: x=${coords[0].toFixed(3)}, y=${coords[1].toFixed(3)}, z=${coords[2].toFixed(3)}`);
+                                }
+                            });
+                        }
+                    }
                     
                     currentStep++;
-                    
-                    // Schedule next step (2 second delay)
                     currentAnimationTimeout = setTimeout(showNextStep, 2000);
                 } else {
                     addToTerminal(`Animation complete!`);
                 }
             }
-            
-            // Start the animation
-            showNextStep();
-        }
+                
+                showNextStep();
+            }
 
         function animateToNewPositions(newBlochData) {
+            // Store the new data for potential resizes
+            currentBlochData = newBlochData;
+            
             // Update each sphere's arrow to the new position
             currentBlochSpheres.forEach((sphereData, index) => {
                 if (index < newBlochData.length) {
@@ -1001,12 +1125,21 @@
             
             updateRotation();
         }
+
         // Handle window resize
+        let resizeTimeout;
         window.addEventListener('resize', () => {
-            // Recreate visualization if it exists
-            if (currentBlochSpheres.length > 0) {
-                // Could implement resize logic here if needed
-            }
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                if (currentBlochSpheres.length > 0 && currentGridContainer) {
+                    recreateBlochSpheres();
+                }
+                
+                // Refresh CodeMirror
+                if (codeEditor) {
+                    codeEditor.refresh();
+                }
+            }, 250);
         });
 
         // Welcome message
