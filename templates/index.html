@@ -182,6 +182,7 @@
             transition: all 0.2s ease;
             margin-top: 10px;
             flex-shrink: 0;
+            width: 100%
         }
 
         #run-button:hover {
@@ -302,6 +303,44 @@
             height: 100%;
         }
 
+        #button-container {
+            margin-top: 10px;
+            flex-shrink: 0;
+            width: 100%;
+        }
+
+        #step-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        #prev-step-button, #next-step-button {
+            flex: 1;
+            background: linear-gradient(135deg, #8b5cf6 0%, #5a67d8 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><circle cx="10" cy="10" r="2" fill="%23b794f6"/><ellipse cx="10" cy="10" rx="8" ry="3" fill="none" stroke="%235a67d8" stroke-width="1"/><ellipse cx="10" cy="10" rx="3" ry="8" fill="none" stroke="%235a67d8" stroke-width="1"/></svg>') 10 10, auto !important; */
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+            transition: all 0.2s ease;
+        }
+
+        #prev-step-button:hover:not(:disabled), #next-step-button:hover:not(:disabled) {
+            background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(139, 92, 246, 0.4);
+        }
+
+        #prev-step-button:disabled, #next-step-button:disabled {
+            background: #e2e8f0;
+            color: #a0aec0;
+            box-shadow: none;
+        }
+
 
 </style>
 </head>
@@ -316,7 +355,13 @@
                 </div>
                 <div class="panel-body">
                     <div id="code-input"></div>
-                    <button id="run-button">▶ Run Code</button>
+                    <div id="button-container">
+                        <button id="run-button">▶ Run Code</button>
+                        <div id="step-buttons" style="display: none;">
+                            <button id="prev-step-button" disabled>◀ Previous Step</button>
+                            <button id="next-step-button">Next Step ▶</button>
+                        </div>
+                    </div>
                 </div>
             </div>
             
@@ -551,9 +596,32 @@
             }
         });
 
+        // Add change listener to CodeMirror to reset UI when code is edited
+        codeEditor.on('change', function(cm, change) {
+            // Only reset if we're currently showing step buttons
+            if (stepButtons.style.display !== 'none') {
+                // Reset to run button
+                document.getElementById('run-button').style.display = 'block';
+                stepButtons.style.display = 'none';
+                
+                // Clear animation state
+                currentAnimationSequence = null;
+                currentStepIndex = -1;
+                totalSteps = 0;
+                
+                // Add a message to terminal
+                addToTerminal('Code modified - ready to run new code');
+            }
+        });
+
         // Terminal functionality
         const terminalOutput = document.getElementById('terminal-output');
         const runButton = document.getElementById('run-button');
+
+        // Add this after where you get terminalOutput and runButton (around line 700)
+        const prevStepButton = document.getElementById('prev-step-button');
+        const nextStepButton = document.getElementById('next-step-button');
+        const stepButtons = document.getElementById('step-buttons');
 
         function addToTerminal(text, isError = false) {
             const prefix = `ψ> `;
@@ -562,10 +630,14 @@
             terminalOutput.scrollTop = terminalOutput.scrollHeight;
         }
 
-        // Run button click handler
+        // REPLACE your existing run button click handler with this:
         runButton.addEventListener('click', async () => {
             const code = codeEditor.getValue().trim();
             if (code) {
+                // Reset UI to show run button
+                document.getElementById('run-button').style.display = 'block';
+                stepButtons.style.display = 'none';
+                
                 addToTerminal(`Executing Qiskit code...`);
                 await runQiskitCode(code);
             } else {
@@ -573,10 +645,30 @@
             }
         });
 
+        // Add these after your existing runButton.addEventListener (around line 720)
+        prevStepButton.addEventListener('click', () => {
+            if (currentStepIndex > 0 && !isAnimatingStep) {
+                animateToPreviousStep();
+            }
+        });
+
+        nextStepButton.addEventListener('click', () => {
+            if (currentStepIndex < totalSteps - 1 && !isAnimatingStep) {
+                showStep(currentStepIndex + 1);
+            }
+        });
+
         // Add these global variables at the top with the others
         let currentGridRows = 1;
         let currentGridCols = 1;
         let currentBlochData = [];
+
+        let currentAnimationSequence = null;  // Stores all animation steps
+        let currentStepIndex = -1;            // Tracks which step we're on
+        let totalSteps = 0;                   // Total number of steps
+
+        let isAnimatingStep = false;
+        let stepAnimationProgress = {};
 
         function createMultiQubitVisualization(blochData, gridRows, gridCols) {
             const canvasContainer = document.getElementById('canvas-container');
@@ -619,6 +711,7 @@
             gridContainer.style.padding = `${padding}px`;
             gridContainer.style.gap = `${padding}px`;
             
+           
             // Create Bloch sphere for each qubit
             blochData.forEach((qubitData, index) => {
                 createSingleBlochSphere(gridContainer, qubitData, sphereSize);
@@ -656,6 +749,7 @@
                 currentGridContainer = null;
             }
         }
+
 
         function createSingleBlochSphere(parentContainer, qubitData, maxSize) {
             // Create simple canvas container without box styling
@@ -1017,74 +1111,165 @@
         let previousCoordinates = {};
 
         function startAnimation(animationSequence, gridRows, gridCols) {
-            // Clear any existing animation
+            // Clear any existing animation timeout
             if (currentAnimationTimeout) {
                 clearTimeout(currentAnimationTimeout);
+                currentAnimationTimeout = null;
             }
             
-            // Start with the first step
-            let currentStep = 0;
+            // Store the animation data (no 'let' keywords - use the global variables)
+            currentAnimationSequence = animationSequence;
+            currentStepIndex = -1;
+            totalSteps = animationSequence.length;
+            currentGridRows = gridRows;
+            currentGridCols = gridCols;
+            
+            // Hide run button, show step buttons
+            document.getElementById('run-button').style.display = 'none';
+            stepButtons.style.display = 'flex';
+            
+            // Reset button states
+            prevStepButton.disabled = true;
+            nextStepButton.disabled = false;
+            
+            // Show first step
+            showStep(0);
+        }
 
-            // Declare previousCoordinates outside the function
-
-            function showNextStep() {
-                if (currentStep < animationSequence.length) {
-                    const stepData = animationSequence[currentStep];
-                    
-                    // Log the current step
-                    addToTerminal(`Step ${stepData.step}: ${stepData.gate_name}${stepData.target_qubits ? ' on qubit(s) ' + stepData.target_qubits.join(',') : ''}`);
-                    
-                    // Update visualization
-                    if (currentStep === 0) {
-                        createMultiQubitVisualization(stepData.bloch_data, gridRows, gridCols);
-                    } else {
-                        animateToNewPositions(stepData.bloch_data);
-                    }
-                    
-                    // Print coordinates
-                    if (currentStep === 0) {
-                        // Initial step - print all qubits
-                        stepData.bloch_data.forEach((qubit) => {
+        function showStep(stepIndex) {
+            if (stepIndex < 0 || stepIndex >= totalSteps || isAnimatingStep) return;
+            
+            isAnimatingStep = true;
+            currentStepIndex = stepIndex;
+            const stepData = currentAnimationSequence[stepIndex];
+            
+            // Log the current step
+            addToTerminal(`Step ${stepData.step}: ${stepData.gate_name}${stepData.target_qubits ? ' on qubit(s) ' + stepData.target_qubits.join(',') : ''}`);
+            
+            // Update visualization
+            if (stepIndex === 0) {
+                createMultiQubitVisualization(stepData.bloch_data, currentGridRows, currentGridCols);
+                // Print all qubit states for initial step
+                stepData.bloch_data.forEach((qubit) => {
+                    const coords = qubit.coordinates;
+                    addToTerminal(`  ${qubit.label}: x=${coords[0].toFixed(3)}, y=${coords[1].toFixed(3)}, z=${coords[2].toFixed(3)}`);
+                });
+                isAnimatingStep = false;
+            } else {
+                animateToNewPositions(stepData.bloch_data);
+                // Print only target qubits for subsequent steps
+                if (stepData.target_qubits && stepData.target_qubits.length > 0) {
+                    stepData.bloch_data.forEach((qubit) => {
+                        if (stepData.target_qubits.includes(parseInt(qubit.label.replace('Qubit ', '')))) {
                             const coords = qubit.coordinates;
                             addToTerminal(`  ${qubit.label}: x=${coords[0].toFixed(3)}, y=${coords[1].toFixed(3)}, z=${coords[2].toFixed(3)}`);
-                        });
-                    } else {
-                        // Subsequent steps - only print target qubits
-                        if (stepData.target_qubits && stepData.target_qubits.length > 0) {
-                            stepData.bloch_data.forEach((qubit) => {
-                                // Check if this qubit is in the target_qubits array
-                                if (stepData.target_qubits.includes(parseInt(qubit.label.replace('Qubit ', '')))) {
-                                    const coords = qubit.coordinates;
-                                    addToTerminal(`  ${qubit.label}: x=${coords[0].toFixed(3)}, y=${coords[1].toFixed(3)}, z=${coords[2].toFixed(3)}`);
-                                }
-                            });
                         }
-                    }
-                    
-                    currentStep++;
-                    currentAnimationTimeout = setTimeout(showNextStep, 2000);
-                } else {
-                    addToTerminal(`Animation complete!`);
+                    });
                 }
+                // Animation will complete in animateToNewPositions
+                setTimeout(() => {
+                    isAnimatingStep = false;
+                    // Update button states
+                    prevStepButton.disabled = (stepIndex === 0);
+                    nextStepButton.disabled = (stepIndex === totalSteps - 1);
+                }, 1500); // Match animation duration
             }
-                
-                showNextStep();
-            }
-
-        function animateToNewPositions(newBlochData) {
-            // Store the new data for potential resizes
-            currentBlochData = newBlochData;
             
-            // Update each sphere's arrow to the new position
+            // If we've reached the last step, show completion message
+            if (stepIndex === totalSteps - 1) {
+                addToTerminal(`Animation complete!`);
+            }
+        }
+
+        // Store animation instances
+        let animationInstances = [];
+
+        // Modified nextStep function
+        function nextStep() {
+            if (currentStep < animationSteps.length && !isAnimating) {
+                isAnimating = true;
+                
+                const step = animationSteps[currentStep];
+                
+                // Create and store the animation instance
+                const animation = anime({
+                    targets: step.targets,
+                    ...step, // spread all properties
+                    complete: function() {
+                        currentStep++;
+                        updateStepIndicator();
+                        isAnimating = false;
+                    }
+                });
+                
+                // Store this animation instance
+                animationInstances[currentStep] = animation;
+            }
+        }
+
+        function animateToPreviousStep() {
+            if (currentStepIndex <= 0 || isAnimatingStep) return;
+            
+            isAnimatingStep = true;
+            
+            // Get the current and previous step data
+            const currentStep = currentAnimationSequence[currentStepIndex];
+            const previousStep = currentAnimationSequence[currentStepIndex - 1];
+            
+            // Log the reverse animation
+            addToTerminal(`Reversing Step ${currentStep.step}: ${currentStep.gate_name}${currentStep.target_qubits ? ' on qubit(s) ' + currentStep.target_qubits.join(',') : ''}`);
+            
+            // Animate arrows back to previous positions
             currentBlochSpheres.forEach((sphereData, index) => {
-                if (index < newBlochData.length) {
-                    const newCoords = newBlochData[index].coordinates;
-                    animateArrowToPosition(sphereData.arrowGroup, newCoords);
+                if (index < previousStep.bloch_data.length) {
+                    const prevCoords = previousStep.bloch_data[index].coordinates;
+                    animateArrowToPosition(sphereData.arrowGroup, prevCoords, () => {
+                        // Callback when animation completes
+                        if (index === currentBlochSpheres.length - 1) {
+                            // Last sphere animation completed
+                            currentStepIndex--;
+                            isAnimatingStep = false;
+                            
+                            // Update button states
+                            prevStepButton.disabled = (currentStepIndex === 0);
+                            nextStepButton.disabled = (currentStepIndex === totalSteps - 1);
+                            
+                            // Update current data
+                            currentBlochData = previousStep.bloch_data;
+                        }
+                    });
                 }
             });
         }
 
-        function animateArrowToPosition(arrowGroup, targetCoords) {
+
+        // Previous step function that reverses the last animation
+        function previousStep() {
+            if (currentStep > 0 && !isAnimating) {
+                isAnimating = true;
+                
+                // Get the last played animation
+                const lastAnimation = animationInstances[currentStep - 1];
+                
+                if (lastAnimation) {
+                    // Set animation direction to reverse and play
+                    lastAnimation.reverse();
+                    lastAnimation.play();
+                    
+                    // Use a promise or callback to handle completion
+                    lastAnimation.finished.then(() => {
+                        currentStep--;
+                        updateStepIndicator();
+                        isAnimating = false;
+                        // Reset the animation direction for potential replay
+                        lastAnimation.reverse();
+                    });
+                }
+            }
+        }
+
+        // Update your existing animateArrowToPosition function to this:
+        function animateArrowToPosition(arrowGroup, targetCoords, onComplete) {
             // Get current rotation
             const startRotationX = arrowGroup.rotation.x;
             const startRotationY = arrowGroup.rotation.y;
@@ -1120,12 +1305,35 @@
                 
                 if (progress < 1) {
                     requestAnimationFrame(updateRotation);
+                } else if (onComplete) {
+                    onComplete();  // Call the callback when animation is done
                 }
             }
             
             updateRotation();
         }
 
+        // Also update your animateToNewPositions function to handle the callback:
+        function animateToNewPositions(newBlochData, onComplete) {
+            // Store the new data for potential resizes
+            currentBlochData = newBlochData;
+            
+            let completedAnimations = 0;
+            const totalAnimations = currentBlochSpheres.length;
+            
+            // Update each sphere's arrow to the new position
+            currentBlochSpheres.forEach((sphereData, index) => {
+                if (index < newBlochData.length) {
+                    const newCoords = newBlochData[index].coordinates;
+                    animateArrowToPosition(sphereData.arrowGroup, newCoords, () => {
+                        completedAnimations++;
+                        if (completedAnimations === totalAnimations && onComplete) {
+                            onComplete();
+                        }
+                    });
+                }
+            });
+        }
         // Handle window resize
         let resizeTimeout;
         window.addEventListener('resize', () => {
